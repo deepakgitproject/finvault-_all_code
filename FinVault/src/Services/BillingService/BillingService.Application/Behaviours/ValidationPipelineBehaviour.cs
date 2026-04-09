@@ -1,0 +1,28 @@
+using FluentValidation;
+using MediatR;
+
+namespace BillingService.Application.Behaviours;
+
+// Runs BEFORE every Command/Query handler automatically
+// If any validator fails → handler is never called → errors returned
+public class ValidationPipelineBehaviour<TRequest, TResponse>(
+    IEnumerable<IValidator<TRequest>> validators
+) : IPipelineBehavior<TRequest, TResponse> where TRequest : notnull
+{
+    public async Task<TResponse> Handle(
+        TRequest request,
+        RequestHandlerDelegate<TResponse> next,
+        CancellationToken ct)
+    {
+        if (!validators.Any()) return await next();
+        var ctx = new ValidationContext<TRequest>(request);
+        var failures = validators
+            .Select(v => v.Validate(ctx))
+            .SelectMany(r => r.Errors)
+            .Where(f => f is not null)
+            .ToList();
+        if (failures.Count != 0)
+            throw new ValidationException(failures);
+        return await next();
+    }
+}

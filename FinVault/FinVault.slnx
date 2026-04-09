@@ -1,0 +1,44 @@
+<Solution>
+  <Folder Name="/angular-spa/" />
+  <Folder Name="/docker/">
+    <File Path="docker-compose.yml" />
+  </Folder>
+  <Folder Name="/src/" />
+  <Folder Name="/src/Services/" />
+  <Folder Name="/src/Services/BillingService/">
+    <Project Path="src/Services/BillingService/BillingService.API/BillingService.API.csproj" />
+    <Project Path="src/Services/BillingService/BillingService.Application/BillingService.Application.csproj" />
+    <Project Path="src/Services/BillingService/BillingService.Domain/BillingService.Domain.csproj" />
+    <Project Path="src/Services/BillingService/BillingService.Infrastructure/BillingService.Infrastructure.csproj" />
+  </Folder>
+  <Folder Name="/src/Services/CardService/">
+    <Project Path="src/Services/CardService/CardService.API/CardService.API.csproj" />
+    <Project Path="src/Services/CardService/CardService.Application/CardService.Application.csproj" />
+    <Project Path="src/Services/CardService/CardService.Domain/CardService.Domain.csproj" />
+    <Project Path="src/Services/CardService/CardService.Infrastructure/CardService.Infrastructure.csproj" />
+  </Folder>
+  <Folder Name="/src/Services/Gateway/">
+    <Project Path="src/Services/Gateway/FinVault.Gateway/FinVault.Gateway.csproj" />
+  </Folder>
+  <Folder Name="/src/Services/IdentityService/">
+    <Project Path="src/Services/IdentityService/IdentityService.API/IdentityService.API.csproj" />
+    <Project Path="src/Services/IdentityService/IdentityService.Application/IdentityService.Application.csproj" />
+    <Project Path="src/Services/IdentityService/IdentityService.Domain/IdentityService.Domain.csproj" />
+    <Project Path="src/Services/IdentityService/IdentityService.Infrastructure/IdentityService.Infrastructure.csproj" />
+  </Folder>
+  <Folder Name="/src/Services/NotificationService/">
+    <Project Path="src/Services/NotificationService/NotificationService.API/NotificationService.API.csproj" />
+    <Project Path="src/Services/NotificationService/NotificationService.Application/NotificationService.Application.csproj" />
+    <Project Path="src/Services/NotificationService/NotificationService.Domain/NotificationService.Domain.csproj" />
+    <Project Path="src/Services/NotificationService/NotificationService.Infrastructure/NotificationService.Infrastructure.csproj" />
+  </Folder>
+  <Folder Name="/src/Services/PaymentService/">
+    <Project Path="src/Services/PaymentService/PaymentService.API/PaymentService.API.csproj" />
+    <Project Path="src/Services/PaymentService/PaymentService.Application/PaymentService.Application.csproj" />
+    <Project Path="src/Services/PaymentService/PaymentService.Domain/PaymentService.Domain.csproj" />
+    <Project Path="src/Services/PaymentService/PaymentService.Infrastructure/PaymentService.Infrastructure.csproj" />
+  </Folder>
+  <Folder Name="/src/Shared/">
+    <Project Path="src/Shared/FinVault.Shared.Contracts/FinVault.Shared.Contracts.csproj" />
+  </Folder>
+</Solution>

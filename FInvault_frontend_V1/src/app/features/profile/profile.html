@@ -1,0 +1,284 @@
+<div class="layout-container">
+  <app-sidebar />
+
+  <main class="main-content">
+
+    <!-- Toast -->
+    @if (showSaveSuccess()) {
+    <div class="toast">
+      <span class="material-symbols-outlined">check_circle</span>
+      Profile updated successfully
+    </div>
+    }
+
+    <!-- --* PROFILE HEADER --* -->
+    <div class="profile-header">
+      <div class="ph-bg"></div>
+      <div class="ph-content">
+        <div class="ph-user">
+          <div class="ph-avatar">
+            <span>{{ userProfile().initials }}</span>
+            <div class="ph-verified"><span class="material-symbols-outlined">check</span></div>
+          </div>
+          <div class="ph-details">
+            <h1>{{ userProfile().fullName }}</h1>
+            <div class="ph-meta" [style.display]="userProfile().email ? 'flex' : 'none'">
+              <span class="ph-email">{{ userProfile().email }}</span>
+            </div>
+          </div>
+        </div>
+        <div class="ph-stats">
+          <div class="ph-stat">
+            <div class="ph-stat-icon"><span class="material-symbols-outlined">credit_card</span></div>
+            <div class="ph-stat-text">
+              <span class="ph-stat-val">{{ cardService.cards().length }}</span>
+              <span class="ph-stat-lbl">Active Cards</span>
+            </div>
+          </div>
+          <div class="ph-stat">
+            <div class="ph-stat-icon"><span class="material-symbols-outlined">account_balance</span></div>
+            <div class="ph-stat-text">
+              <span class="ph-stat-val">Rs.{{ totalManaged() }}</span>
+              <span class="ph-stat-lbl">Total Managed</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- --* PERSONAL INFORMATION - FULL WIDTH --* -->
+    <section class="section-card">
+      <div class="sc-header">
+        <div class="sc-title">
+          <span class="material-symbols-outlined sc-icon sc-icon--blue">person</span>
+          Personal Information
+        </div>
+        <button class="sc-edit-btn" (click)="toggleEditMode()">
+          <span class="material-symbols-outlined">{{ editMode() ? 'close' : 'edit' }}</span>
+          {{ editMode() ? 'Cancel' : 'Edit Profile' }}
+        </button>
+      </div>
+      <div class="sc-body">
+        <div class="info-grid">
+          <div class="info-item">
+            <label>FULL NAME</label>
+            @if (editMode()) {
+            <input class="info-input" type="text" [(ngModel)]="profileForm.fullName">
+            } @else {
+            <span class="info-val">{{ userProfile().fullName }}</span>
+            }
+          </div>
+          <div class="info-item">
+            <label>EMAIL ADDRESS</label>
+            @if (editMode()) {
+            <input class="info-input" type="email" [(ngModel)]="profileForm.email">
+            } @else {
+            <span class="info-val">{{ userProfile().email }}</span>
+            }
+          </div>
+          <div class="info-item">
+            <label>PHONE NUMBER</label>
+            @if (editMode()) {
+            <input class="info-input" type="text" [(ngModel)]="profileForm.phone">
+            } @else {
+            <span class="info-val mono">{{ userProfile().phone }}</span>
+            }
+          </div>
+          <div class="info-item">
+            <label>DATE OF BIRTH</label>
+            @if (editMode()) {
+            <input class="info-input" type="text" [(ngModel)]="profileForm.dateOfBirth">
+            } @else {
+            <span class="info-val mono">{{ userProfile().dateOfBirth }}</span>
+            }
+          </div>
+          <div class="info-item">
+            <label>ADDRESS</label>
+            @if (editMode()) {
+            <input class="info-input" type="text" [(ngModel)]="profileForm.address">
+            } @else {
+            <span class="info-val">{{ userProfile().address }}</span>
+            }
+          </div>
+          <!-- Removing static MEMBER SINCE -->
+        </div>
+      </div>
+      @if (editMode()) {
+      <div class="sc-footer">
+        <button class="btn-ghost" (click)="toggleEditMode()">Discard</button>
+        <button class="btn-primary" (click)="saveProfile()">
+          <span class="material-symbols-outlined">save</span>
+          Save Changes
+        </button>
+      </div>
+      }
+    </section>
+
+    <!-- --* SECURITY + PREFERENCES - SIDE BY SIDE --* -->
+    <div class="twin-grid">
+
+      <!-- Security -->
+      <section class="section-card">
+        <div class="sc-header">
+          <div class="sc-title">
+            <span class="material-symbols-outlined sc-icon sc-icon--green">security</span>
+            Security
+          </div>
+        </div>
+        <div class="sc-body flush">
+          <div class="sec-row" (click)="togglePasswords()">
+            <div class="sec-left">
+              <div class="sec-dot sec-dot--blue"></div>
+              <div class="sec-text">
+                <span class="sec-name">Change Password</span>
+                <span class="sec-sub">Update your security credentials</span>
+              </div>
+            </div>
+            <span class="material-symbols-outlined sec-arrow" [class.flipped]="showCurrentPassword()">expand_more</span>
+          </div>
+          @if (showCurrentPassword()) {
+          <div class="pw-panel">
+            <input class="info-input" type="password" placeholder="Current password">
+            <input class="info-input" type="password" placeholder="New password">
+            <input class="info-input" type="password" placeholder="Confirm new password">
+            <button class="btn-primary sm">Update Password</button>
+          </div>
+          }
+          <div class="sec-row">
+            <div class="sec-left">
+              <div class="sec-dot sec-dot--green"></div>
+              <div class="sec-text">
+                <span class="sec-name">Two-Factor Authentication</span>
+                <span class="sec-sub text-green">Not configured</span>
+              </div>
+            </div>
+            <div class="toggle" [class.on]="twoFactorAuth()" (click)="toggleTwoFactor()">
+              <div class="toggle-knob"></div>
+            </div>
+          </div>
+          <div class="sec-row">
+            <div class="sec-left">
+              <div class="sec-dot sec-dot--purple"></div>
+              <div class="sec-text">
+                <span class="sec-name">Active Sessions</span>
+                <span class="sec-sub">Manage connected devices</span>
+              </div>
+            </div>
+            <div class="sec-right-group">
+              <span class="chip-sm">This device</span>
+              <span class="material-symbols-outlined sec-arrow">chevron_right</span>
+            </div>
+          </div>
+          <div class="sec-row">
+            <div class="sec-left">
+              <div class="sec-dot sec-dot--amber"></div>
+              <div class="sec-text">
+                <span class="sec-name">Login History</span>
+                <span class="sec-sub">Review recent sign-ins</span>
+              </div>
+            </div>
+            <span class="material-symbols-outlined sec-arrow">chevron_right</span>
+          </div>
+        </div>
+      </section>
+
+      <!-- Preferences -->
+      <section class="section-card">
+        <div class="sc-header">
+          <div class="sc-title">
+            <span class="material-symbols-outlined sc-icon sc-icon--purple">tune</span>
+            Preferences
+          </div>
+        </div>
+        <div class="sc-body flush">
+          <div class="pref-row">
+            <span>Dark Mode</span>
+            <div class="toggle" [class.on]="darkMode()" (click)="toggleDarkMode()">
+              <div class="toggle-knob"></div>
+            </div>
+          </div>
+          <div class="pref-row">
+            <span>Email Notifications</span>
+            <div class="toggle" [class.on]="emailNotifications()" (click)="toggleEmailNotifications()">
+              <div class="toggle-knob"></div>
+            </div>
+          </div>
+          <div class="pref-row">
+            <span>Auto-Pay Bills</span>
+            <div class="toggle" [class.on]="autoPay()" (click)="toggleAutoPay()">
+              <div class="toggle-knob"></div>
+            </div>
+          </div>
+          <div class="pref-row">
+            <span>Bill Reminders</span>
+            <div class="toggle" [class.on]="billReminders()" (click)="toggleBillReminders()">
+              <div class="toggle-knob"></div>
+            </div>
+          </div>
+          <div class="pref-sep"></div>
+          <div class="pref-row nav">
+            <span>Currency</span>
+            <span class="pref-val">INR (Rs.) <span class="material-symbols-outlined">chevron_right</span></span>
+          </div>
+        </div>
+      </section>
+    </div>
+
+    <!-- --* DANGER ZONE --* -->
+    <!-- --*  SIGN OUT BUTTON --*  -->
+    <button class="btn-sign-out" (click)="onSignOut()">
+      <span class="material-symbols-outlined">logout</span>
+      Sign Out
+    </button>
+
+    <section class="section-card danger">
+      <div class="sc-header danger-head">
+        <div class="sc-title">
+          <span class="material-symbols-outlined sc-icon sc-icon--red">warning</span>
+          Danger Zone
+        </div>
+      </div>
+      <div class="sc-body flush">
+        <div class="dz-row">
+          <div class="dz-text">
+            <span class="dz-name">Deactivate Account</span>
+            <span class="dz-desc">Temporarily disable your account and pause all scheduled payments.</span>
+          </div>
+          <button class="btn-outline-red">Deactivate</button>
+        </div>
+        <div class="dz-row">
+          <div class="dz-text">
+            <span class="dz-name">Delete Account</span>
+            <span class="dz-desc">Permanently remove all data. This cannot be undone.</span>
+          </div>
+          <button class="btn-red" (click)="openDeleteModal()">Delete Account</button>
+        </div>
+      </div>
+    </section>
+
+    <!-- --* DELETE MODAL --* -->
+    @if (deleteConfirmModal()) {
+    <div class="modal-overlay" (click)="closeDeleteModal()">
+      <div class="modal-card" (click)="$event.stopPropagation()">
+        <div class="modal-icon">
+          <span class="material-symbols-outlined">delete_forever</span>
+        </div>
+        <h3>Delete your account?</h3>
+        <p>All your cards, payment history, and personal data will be permanently erased. This action cannot be
+          reversed.</p>
+        <div class="modal-confirm">
+          <label>Type <strong>DELETE</strong> to confirm</label>
+          <input class="info-input centered" type="text" [(ngModel)]="deleteConfirmInput" placeholder="Type DELETE">
+        </div>
+        <div class="modal-btns">
+          <button class="btn-ghost" (click)="closeDeleteModal()">Cancel</button>
+          <button class="btn-red" [disabled]="deleteConfirmInput() !== 'DELETE'" (click)="confirmDelete()">Permanently
+            Delete</button>
+        </div>
+      </div>
+    </div>
+    }
+
+  </main>
+</div>
+

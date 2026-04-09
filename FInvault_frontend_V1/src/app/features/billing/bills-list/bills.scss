@@ -1,0 +1,861 @@
+// -------------------------------------------------------------------
+//  FinVault - Bills Page
+//  bills.scss
+// -------------------------------------------------------------------
+
+// -- Mixins ----------------------------------------------------------
+@mixin glass-card {
+    background: var(--glass-bg);
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+    border: 1px solid rgba(255, 255, 255, 0.6);
+}
+
+@mixin glass-card-strong {
+    background: var(--glass-bg-strong);
+    backdrop-filter: blur(24px);
+    -webkit-backdrop-filter: blur(24px);
+    border: 1px solid rgba(255, 255, 255, 0.75);
+}
+
+@mixin label-tiny {
+    font-family: 'Space Grotesk', sans-serif;
+    font-size: 0.65rem;
+    font-weight: 600;
+    letter-spacing: 0.09em;
+    text-transform: uppercase;
+    color: var(--text-muted);
+}
+
+// -- Root layout -----------------------------------------------------
+.bills-page {
+    display: flex;
+    min-height: 100vh;
+}
+
+// -------------------------------------------------------------------
+//  SIDEBAR (shared with dashboard)
+// -------------------------------------------------------------------
+$sidebar-width: 300px;
+@import '../../../shared/styles/sidebar';
+
+// -------------------------------------------------------------------
+//  MAIN CONTENT
+// -------------------------------------------------------------------
+.main-content {
+    margin-left: $sidebar-width;
+    padding: 40px 44px;
+    flex: 1;
+    min-height: 100vh;
+}
+
+// -- Page Header ------------------------------------------------------
+.page-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 40px;
+
+    &__user {
+        display: flex;
+        align-items: center;
+        gap: 14px;
+    }
+
+    &__avatar {
+        width: 46px;
+        height: 46px;
+        border-radius: 50%;
+        background: linear-gradient(135deg, var(--primary), var(--secondary));
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-family: 'Plus Jakarta Sans', sans-serif;
+        font-size: 0.875rem;
+        font-weight: 800;
+        color: #fff;
+        flex-shrink: 0;
+        box-shadow: 0 4px 14px rgba(107, 110, 249, 0.35);
+    }
+
+    &__name {
+        display: block;
+        font-family: 'Plus Jakarta Sans', sans-serif;
+        font-size: 0.95rem;
+        font-weight: 700;
+        color: var(--text-primary);
+    }
+
+    &__tier {
+        display: block;
+        @include label-tiny;
+        margin-top: 2px;
+    }
+
+    &__actions {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+    }
+
+    &__icon-btn {
+        width: 42px;
+        height: 42px;
+        border-radius: 12px;
+        @include glass-card-strong;
+        border: none;
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: var(--text-secondary);
+        transition: background 0.2s, color 0.2s, transform 0.15s;
+        box-shadow: 0 2px 10px rgba(0, 0, 0, 0.07);
+
+        .material-symbols-outlined {
+            font-size: 1.15rem;
+        }
+
+        &:hover {
+            background: var(--primary-light);
+            color: var(--primary);
+            transform: translateY(-1px);
+        }
+    }
+
+    &__report-btn {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        padding: 10px 20px;
+        border-radius: 999px;
+        @include glass-card-strong;
+        border: 1px solid rgba(107, 110, 249, 0.18);
+        cursor: pointer;
+        font-family: 'Plus Jakarta Sans', sans-serif;
+        font-size: 0.82rem;
+        font-weight: 600;
+        color: var(--text-primary);
+        box-shadow: 0 4px 14px rgba(0, 0, 0, 0.09);
+        transition: transform 0.15s, box-shadow 0.15s;
+
+        .material-symbols-outlined {
+            font-size: 1rem;
+            color: var(--primary);
+        }
+
+        &:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 6px 20px rgba(107, 110, 249, 0.18);
+        }
+    }
+}
+
+// -- Title Section ----------------------------------------------------
+.title-section {
+    display: flex;
+    align-items: flex-end;
+    justify-content: space-between;
+    gap: 24px;
+    margin-bottom: 36px;
+    flex-wrap: wrap;
+
+    &__heading {
+        font-family: 'Plus Jakarta Sans', sans-serif;
+        font-size: 3.5rem;
+        font-weight: 800;
+        color: var(--text-primary);
+        line-height: 1.05;
+        margin: 0 0 8px;
+        letter-spacing: -0.02em;
+    }
+
+    &__sub {
+        font-family: 'Plus Jakarta Sans', sans-serif;
+        font-size: 0.9rem;
+        color: var(--text-muted);
+        margin: 0;
+        max-width: 480px;
+        line-height: 1.55;
+    }
+
+    &__filters {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        flex-shrink: 0;
+        flex-wrap: wrap;
+    }
+}
+
+// Filter pills
+.filter-pill {
+    padding: 9px 18px;
+    border-radius: 999px;
+    font-family: 'Plus Jakarta Sans', sans-serif;
+    font-size: 0.8rem;
+    font-weight: 600;
+    cursor: pointer;
+    border: none;
+    transition: all 0.18s;
+    @include glass-card-strong;
+    color: var(--text-secondary);
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+    white-space: nowrap;
+
+    &:hover {
+        background: var(--primary-light);
+        color: var(--primary);
+    }
+
+    &--active {
+        background: linear-gradient(135deg, var(--primary), var(--secondary)) !important;
+        color: #fff !important;
+        box-shadow: 0 4px 14px rgba(107, 110, 249, 0.35) !important;
+    }
+
+    &--dropdown {
+        display: flex;
+        align-items: center;
+        gap: 4px;
+        padding-right: 12px;
+
+        .material-symbols-outlined {
+            font-size: 1rem;
+        }
+    }
+}
+
+
+// -------------------------------------------------------------------
+//  QUICK PAY
+// -------------------------------------------------------------------
+.quick-pay {
+    margin-bottom: 40px;
+
+    &__header {
+        margin: 0 0 20px;
+    }
+
+    &__heading {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        font-family: 'Plus Jakarta Sans', sans-serif;
+        font-size: 1.25rem;
+        font-weight: 800;
+        color: var(--text-primary);
+        margin: 0 0 4px;
+        letter-spacing: -0.01em;
+    }
+
+    &__sub {
+        font-family: 'Plus Jakarta Sans', sans-serif;
+        font-size: 0.9rem;
+        color: var(--text-muted);
+        margin: 0;
+    }
+
+    &__heading-icon {
+        font-size: 1.3rem;
+        color: var(--primary);
+        font-variation-settings: 'FILL' 1;
+    }
+
+    &__grid {
+        display: grid;
+        grid-template-columns: repeat(4, 1fr);
+        gap: 16px;
+
+        @media (max-width: 900px) {
+            grid-template-columns: repeat(2, 1fr);
+        }
+    }
+}
+
+// -- Quick-Pay Tile ----------------------------------------------------
+.qp-tile {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 12px;
+    height: 120px;
+    min-height: 120px;
+    min-width: 140px;
+    border-radius: 16px;
+    border: none;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.06);
+    cursor: pointer;
+    transition: transform 0.3s, box-shadow 0.3s;
+    padding: 0 12px;
+    position: relative;
+    overflow: hidden;
+
+    &:hover {
+        transform: translateY(-4px);
+        box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
+    }
+
+    &:active {
+        transform: scale(0.98);
+    }
+
+    &__icon-circle {
+        width: 48px;
+        height: 48px;
+        border-radius: 50%;
+        background: rgba(0, 0, 0, 0.06);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        flex-shrink: 0;
+        transition: all 0.3s ease;
+
+        .material-symbols-outlined {
+            font-size: 32px;
+            color: var(--icon-color, #6B6EF9);
+            font-variation-settings: 'FILL' 1;
+        }
+    }
+
+    &__label {
+        font-family: 'Plus Jakarta Sans', sans-serif;
+        font-size: 14px;
+        font-weight: 600;
+        color: var(--text-primary);
+        text-align: center;
+        line-height: 1.3;
+        white-space: nowrap;
+        z-index: 1;
+    }
+
+    &.qp-cat-electricity { 
+        background: linear-gradient(135deg, #FFF3E0, #FFE0B2); 
+        --icon-color: #FF9800; // orange
+    }
+    &.qp-cat-water { 
+        background: linear-gradient(135deg, #E0F7FA, #B2EBF2); 
+        --icon-color: #00BCD4; // cyan
+    }
+    &.qp-cat-internet { 
+        background: linear-gradient(135deg, #EDE7F6, #D1C4E9); 
+        --icon-color: #9C27B0; // purple
+    }
+    &.qp-cat-recharge { 
+        background: linear-gradient(135deg, #E8F5E9, #C8E6C9); 
+        --icon-color: #4CAF50; // green
+    }
+    &.qp-cat-rent { 
+        background: linear-gradient(135deg, #FFF8E1, #FFECB3); 
+        --icon-color: #FFB300; // amber
+    }
+    &.qp-cat-gas { 
+        background: linear-gradient(135deg, #FBE9E7, #FFCCBC); 
+        --icon-color: #FF5722; // deep-orange
+    }
+    &.qp-cat-insurance { 
+        background: linear-gradient(135deg, #E8EAF6, #C5CAE9); 
+        --icon-color: #3F51B5; // indigo
+    }
+    &.qp-cat-metro { 
+        background: linear-gradient(135deg, #E0F2F1, #B2DFDB); 
+        --icon-color: #009688; // teal
+    }
+}
+
+[data-theme='dark'] {
+   .qp-tile {
+       &.qp-cat-electricity { background: linear-gradient(135deg, #4E342E, #3E2723); }
+       &.qp-cat-water { background: linear-gradient(135deg, #006064, #004D40); }
+       &.qp-cat-internet { background: linear-gradient(135deg, #4A148C, #311B92); }
+       &.qp-cat-recharge { background: linear-gradient(135deg, #1B5E20, #004D40); }
+       &.qp-cat-rent { background: linear-gradient(135deg, #FF8F00, #FF6F00); }
+       &.qp-cat-gas { background: linear-gradient(135deg, #BF360C, #3E2723); }
+       &.qp-cat-insurance { background: linear-gradient(135deg, #1A237E, #0D47A1); }
+       &.qp-cat-metro { background: linear-gradient(135deg, #004D40, #00251A); }
+
+       .qp-tile__icon-circle {
+           background: rgba(255, 255, 255, 0.15);
+       }
+       .qp-tile__label {
+           color: #E2E8F0;
+       }
+   }
+}
+
+// -------------------------------------------------------------------
+//  BILLS LIST
+// -------------------------------------------------------------------
+.bills-list {
+    display: flex;
+    flex-direction: column;
+    margin-bottom: 36px;
+
+    .empty-bills {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        padding: 60px 40px;
+        text-align: center;
+        gap: 12px;
+
+        .empty-icon {
+            font-size: 4rem;
+            color: var(--primary);
+            opacity: 0.2;
+            margin-bottom: 8px;
+        }
+
+        h3 {
+            font-family: 'Plus Jakarta Sans', sans-serif;
+            font-size: 1.25rem;
+            font-weight: 700;
+            color: var(--text-primary);
+            margin: 0;
+        }
+
+        p {
+            font-family: 'Plus Jakarta Sans', sans-serif;
+            font-size: 0.9rem;
+            color: var(--text-muted);
+            margin: 0;
+            max-width: 300px;
+        }
+    }
+}
+
+// -- Bill Group -------------------------------------------------------
+.bill-group {
+    &--faded {
+        opacity: 0.78;
+    }
+
+    &__header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        margin-bottom: 16px;
+        padding: 0 4px;
+    }
+
+    &__month {
+        font-family: 'Plus Jakarta Sans', sans-serif;
+        font-size: 1.2rem;
+        font-weight: 700;
+        color: var(--text-primary);
+
+        &--muted {
+            color: var(--text-muted);
+        }
+    }
+
+    &__badge {
+        @include label-tiny;
+
+        &--error {
+            color: var(--error);
+        }
+
+        &--muted {
+            color: var(--text-muted);
+        }
+    }
+}
+
+// -- Bill Card (Row) --------------------------------------------------
+.bill-card {
+    display: flex;
+    align-items: center;
+    gap: 0;
+    padding: 20px 24px;
+    border-radius: 20px;
+    @include glass-card-strong;
+    box-shadow: 0 2px 14px rgba(0, 0, 0, 0.06);
+    margin-bottom: 12px;
+    transition: transform 0.2s, box-shadow 0.2s;
+    cursor: pointer;
+
+    &:last-child {
+        margin-bottom: 0;
+    }
+
+    &:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 8px 28px rgba(107, 110, 249, 0.14);
+    }
+
+    // Identity: icon + title
+    &__identity {
+        display: flex;
+        align-items: center;
+        gap: 16px;
+        flex: 1.8;
+        min-width: 0;
+    }
+
+    &__icon-wrap {
+        width: 44px;
+        height: 44px;
+        border-radius: 14px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        flex-shrink: 0;
+
+        .material-symbols-outlined {
+            font-size: 1.2rem;
+            font-variation-settings: 'FILL' 1;
+        }
+
+        &--blue {
+            background: rgba(59, 130, 246, 0.14);
+
+            .material-symbols-outlined {
+                color: #3B82F6;
+            }
+        }
+
+        &--purple {
+            background: rgba(167, 139, 250, 0.16);
+
+            .material-symbols-outlined {
+                color: var(--secondary);
+            }
+        }
+
+        &--green {
+            background: rgba(34, 197, 94, 0.14);
+
+            .material-symbols-outlined {
+                color: var(--success);
+            }
+        }
+
+        &--grey {
+            background: rgba(136, 136, 170, 0.14);
+
+            .material-symbols-outlined {
+                color: var(--text-muted);
+            }
+        }
+    }
+
+    &__title-block {
+        display: flex;
+        flex-direction: column;
+        gap: 3px;
+        min-width: 0;
+    }
+
+    &__title {
+        font-family: 'Plus Jakarta Sans', sans-serif;
+        font-size: 0.95rem;
+        font-weight: 700;
+        color: var(--text-primary);
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+    }
+
+    &__subtitle {
+        @include label-tiny;
+        font-size: 0.62rem;
+    }
+
+    // Amount columns
+    &__amount-col {
+        flex: 1;
+        display: flex;
+        flex-direction: column;
+        gap: 4px;
+        padding: 0 12px;
+    }
+
+    &__amount-label {
+        @include label-tiny;
+        font-size: 0.62rem;
+    }
+
+    &__amount {
+        font-family: 'Space Grotesk', sans-serif;
+        font-size: 0.95rem;
+        font-weight: 700;
+        color: var(--text-primary);
+
+        &--paid {
+            color: var(--primary);
+        }
+    }
+
+    // Status col
+    &__status-col {
+        flex: 0.9;
+        display: flex;
+        flex-direction: column;
+        gap: 4px;
+        padding: 0 12px;
+    }
+
+    // Action button
+    &__action {
+        width: 40px;
+        height: 40px;
+        border-radius: 50%;
+        border: none;
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        flex-shrink: 0;
+        margin-left: 8px;
+        transition: transform 0.15s, box-shadow 0.15s;
+
+        .material-symbols-outlined {
+            font-size: 1.05rem;
+        }
+
+        &--primary {
+            background: var(--primary);
+            color: #fff;
+            box-shadow: 0 4px 12px rgba(107, 110, 249, 0.4);
+
+            &:hover {
+                transform: scale(1.1);
+                box-shadow: 0 6px 18px rgba(107, 110, 249, 0.5);
+            }
+        }
+
+        &--muted {
+            background: rgba(136, 136, 170, 0.1);
+            color: var(--text-muted);
+            border: 1px solid rgba(136, 136, 170, 0.2);
+
+            &:hover {
+                background: var(--primary-light);
+                color: var(--primary);
+                transform: scale(1.08);
+            }
+        }
+    }
+}
+
+// -- Status Pill ------------------------------------------------------
+.status-pill {
+    display: inline-flex;
+    align-items: center;
+    padding: 4px 11px;
+    border-radius: 999px;
+    font-family: 'Space Grotesk', sans-serif;
+    font-size: 0.65rem;
+    font-weight: 700;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    white-space: nowrap;
+    border: 1px solid transparent;
+
+    &--overdue {
+        background: rgba(239, 68, 68, 0.12);
+        color: var(--error);
+        border-color: rgba(239, 68, 68, 0.2);
+    }
+
+    &--pending {
+        background: rgba(245, 158, 11, 0.12);
+        color: var(--warning);
+        border-color: rgba(245, 158, 11, 0.2);
+    }
+
+    &--paid {
+        background: rgba(34, 197, 94, 0.12);
+        color: var(--success);
+        border-color: rgba(34, 197, 94, 0.2);
+    }
+
+    &--partial {
+        background: rgba(245, 124, 0, 0.12);
+        color: #F57C00;
+        border-color: rgba(245, 124, 0, 0.2);
+    }
+}
+
+// -------------------------------------------------------------------
+//  BOTTOM ROW
+// -------------------------------------------------------------------
+.bottom-row {
+    display: flex;
+    gap: 24px;
+    align-items: stretch;
+}
+
+// -- Auto-Pay Card -----------------------------------------------------
+.autopay-card {
+    flex: 1.6;
+    border-radius: 28px;
+    @include glass-card-strong;
+    box-shadow: 0 4px 24px rgba(107, 110, 249, 0.09);
+    padding: 36px 40px;
+    position: relative;
+    overflow: hidden;
+
+    &__content {
+        position: relative;
+        z-index: 1;
+    }
+
+    &__title {
+        font-family: 'Plus Jakarta Sans', sans-serif;
+        font-size: 1.8rem;
+        font-weight: 800;
+        color: var(--text-primary);
+        margin: 0 0 14px;
+        letter-spacing: -0.01em;
+    }
+
+    &__body {
+        font-family: 'Plus Jakarta Sans', sans-serif;
+        font-size: 0.9rem;
+        color: var(--text-secondary);
+        line-height: 1.65;
+        margin: 0 0 28px;
+        max-width: 480px;
+
+        strong {
+            color: var(--primary);
+            font-weight: 700;
+        }
+    }
+
+    &__btn {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        padding: 12px 26px;
+        border-radius: 999px;
+        background: linear-gradient(135deg, var(--primary), var(--secondary));
+        color: #fff;
+        border: none;
+        cursor: pointer;
+        font-family: 'Plus Jakarta Sans', sans-serif;
+        font-size: 0.85rem;
+        font-weight: 700;
+        box-shadow: 0 6px 20px rgba(107, 110, 249, 0.4);
+        transition: transform 0.15s, box-shadow 0.15s;
+
+        .material-symbols-outlined {
+            font-size: 1.1rem;
+        }
+
+        &:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 28px rgba(107, 110, 249, 0.5);
+        }
+    }
+
+    &__watermark {
+        position: absolute;
+        bottom: -16px;
+        right: -10px;
+        font-size: 9rem;
+        color: rgba(107, 110, 249, 0.055);
+        pointer-events: none;
+        user-select: none;
+        line-height: 1;
+        font-variation-settings: 'FILL' 1;
+    }
+}
+
+// -- Monthly Stats Card ------------------------------------------------
+.stats-card {
+    flex: 1;
+    border-radius: 28px;
+    @include glass-card-strong;
+    box-shadow: 0 4px 24px rgba(107, 110, 249, 0.09);
+    padding: 32px 32px 28px;
+    display: flex;
+    flex-direction: column;
+    gap: 0;
+
+    &__label {
+        @include label-tiny;
+        font-size: 0.65rem;
+        margin-bottom: 10px;
+    }
+
+    &__amount-row {
+        display: flex;
+        align-items: baseline;
+        gap: 12px;
+        margin-bottom: 28px;
+    }
+
+    &__amount {
+        font-family: 'Space Grotesk', sans-serif;
+        font-size: 2.6rem;
+        font-weight: 800;
+        color: var(--text-primary);
+        letter-spacing: -0.02em;
+        line-height: 1;
+    }
+
+    &__change {
+        font-family: 'Space Grotesk', sans-serif;
+        font-size: 0.82rem;
+        font-weight: 700;
+        color: var(--success);
+        background: rgba(34, 197, 94, 0.12);
+        padding: 3px 9px;
+        border-radius: 999px;
+    }
+
+    &__bars {
+        display: flex;
+        flex-direction: column;
+        gap: 18px;
+    }
+}
+
+// -- Stats Bar ---------------------------------------------------------
+.stats-bar {
+    &__labels {
+        display: flex;
+        justify-content: space-between;
+        margin-bottom: 7px;
+    }
+
+    &__name {
+        font-family: 'Plus Jakarta Sans', sans-serif;
+        font-size: 0.8rem;
+        font-weight: 600;
+        color: var(--text-secondary);
+    }
+
+    &__pct {
+        font-family: 'Space Grotesk', sans-serif;
+        font-size: 0.8rem;
+        font-weight: 700;
+        color: var(--text-muted);
+    }
+
+    &__track {
+        height: 6px;
+        border-radius: 999px;
+        background: rgba(136, 136, 170, 0.15);
+        overflow: hidden;
+    }
+
+    &__fill {
+        height: 100%;
+        border-radius: 999px;
+        transition: width 0.6s cubic-bezier(0.34, 1.56, 0.64, 1);
+
+        &--primary {
+            background: linear-gradient(90deg, var(--primary), var(--secondary));
+        }
+
+        &--secondary {
+            background: linear-gradient(90deg, var(--secondary), #c4b5fd);
+        }
+    }
+}

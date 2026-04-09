@@ -1,0 +1,183 @@
+<!-- Ambient Orbs -->
+<div class="ambient-orb orb-top-right"></div>
+<div class="ambient-orb orb-bottom-left"></div>
+
+<div class="page-layout">
+    <!-- SIDEBAR -->
+    <app-sidebar />
+
+    <!-- MAIN CONTENT -->
+    <main class="main-content">
+
+        <!-- PAGE HEADER -->
+        <header class="page-header">
+            <div class="page-header__user">
+                <div class="page-header__avatar">{{ userName().slice(0,2).toUpperCase() }}</div>
+                <div class="page-header__user-info">
+                    <span class="page-header__name">{{ userName() }}</span>
+                </div>
+            </div>
+            <div class="page-header__actions">
+                <app-theme-toggle />
+                <button class="page-header__icon-btn" (click)="onWalletClick()">
+                    <span class="material-symbols-outlined">account_balance_wallet</span>
+                </button>
+            </div>
+        </header>
+
+        <!-- TITLE + FILTERS -->
+        <section class="title-section">
+            <div class="title-section__left">
+                <h1 class="title-section__heading">Your Bills</h1>
+                <p class="title-section__sub">Manage your monthly commitments and track pending payments with precision.
+                </p>
+            </div>
+            <div class="title-section__filters">
+                <button *ngFor="let f of filters" class="filter-pill" [class.filter-pill--active]="activeFilter() === f"
+                    (click)="setFilter(f)">
+                    {{ f }}
+                </button>
+            </div>
+        </section>
+
+        <!-- QUICK Pay -->
+        <section class="quick-pay">
+            <div class="quick-pay__header">
+                <h2 class="quick-pay__heading">
+                    <span class="material-symbols-outlined quick-pay__heading-icon">bolt</span>
+                    Quick Pay
+                </h2>
+                <p class="quick-pay__sub">Pay your bills instantly</p>
+            </div>
+            
+            <div class="quick-pay__grid">
+                <button *ngFor="let cat of quickPayCategories" class="qp-tile qp-cat-{{ cat.id }}" (click)="onQuickPayClick(cat.label, cat.category)" [title]="cat.label">
+                    <span class="qp-tile__icon-circle">
+                        <span class="material-symbols-outlined">{{ cat.icon }}</span>
+                    </span>
+                    <span class="qp-tile__label">{{ cat.label }}</span>
+                </button>
+            </div>
+        </section>
+
+        <!-- BILL GROUPS -->
+        <div class="bills-list">
+            <div *ngFor="let group of billGroups" class="bill-group" [class.bill-group--faded]="group.faded">
+
+                <!-- GROUP HEADER -->
+                <div class="bill-group__header">
+                    <span class="bill-group__month" [class.bill-group__month--muted]="group.faded">
+                        {{ group.month }}
+                    </span>
+                    <span class="bill-group__badge" [class.bill-group__badge--error]="group.badgeType === 'error'"
+                        [class.bill-group__badge--muted]="group.badgeType === 'muted'">
+                        {{ group.badgeLabel }}
+                    </span>
+                </div>
+
+                <!-- BILL ROWS -->
+                <div class="bill-card" *ngFor="let bill of group.bills">
+
+                    <!-- Icon + Title -->
+                    <div class="bill-card__identity">
+                        <div class="bill-card__icon-wrap" [ngClass]="'bill-card__icon-wrap--' + bill.iconBg">
+                            <span class="material-symbols-outlined">{{ bill.icon }}</span>
+                        </div>
+                        <div class="bill-card__title-block">
+                            <span class="bill-card__title">{{ bill.title }}</span>
+                            <span class="bill-card__subtitle">{{ bill.subtitle }}</span>
+                        </div>
+                    </div>
+
+                    <!-- Total Due -->
+                    <div class="bill-card__amount-col">
+                        <span class="bill-card__amount-label">TOTAL DUE</span>
+                        <span class="bill-card__amount">{{ bill.totalDue }}</span>
+                    </div>
+
+                    <!-- Secondary Amount -->
+                    <div class="bill-card__amount-col">
+                        <span class="bill-card__amount-label">{{ bill.secondaryLabel }}</span>
+                        <span class="bill-card__amount"
+                            [class.bill-card__amount--paid]="bill.secondaryLabel === 'AMOUNT PAID' && bill.status === 'PAID'">
+                            {{ bill.secondaryAmount }}
+                        </span>
+                    </div>
+
+                    <!-- Status -->
+                    <div class="bill-card__status-col">
+                        <span class="bill-card__amount-label">STATUS</span>
+                        <span class="status-pill" [class.status-pill--overdue]="bill.status === 'OVERDUE'"
+                            [class.status-pill--pending]="bill.status === 'PENDING'"
+                            [class.status-pill--paid]="bill.status === 'PAID'"
+                            [class.status-pill--partial]="bill.status === 'PARTIALLYPAID'">
+                            {{ bill.status === 'PARTIALLYPAID' ? 'PARTIALLY PAID' : bill.status }}
+                        </span>
+                    </div>
+
+                    <!-- Action -->
+                    <button class="bill-card__action"
+                        [class.bill-card__action--primary]="bill.actionStyle === 'primary'"
+                        [class.bill-card__action--muted]="bill.actionStyle === 'muted'" (click)="onBillAction(bill)">
+                        <span class="material-symbols-outlined">{{ bill.actionIcon }}</span>
+                    </button>
+
+                </div>
+            </div>
+
+            <div *ngIf="billGroups.length === 0" class="empty-bills glass-card">
+                <span class="material-symbols-outlined empty-icon">receipt_long</span>
+                <h3>No bills found</h3>
+                <p>Your bills will appear here.</p>
+            </div>
+        </div>
+
+        <!-- BOTTOM ROW -->
+        <div class="bottom-row">
+
+            <!-- Upcoming Dues -->
+            <div class="upcoming-summary-card glass-card">
+                <div class="autopay-card__content">
+                    <h3 class="autopay-card__title">Upcoming Dues</h3>
+                    @if (upcomingBills().length > 0) {
+                        <p class="autopay-card__body">
+                            You have <strong>{{ upcomingBills().length }} recurring bills</strong> scheduled for the next 7 days.
+                            Ensure your account is funded.
+                        </p>
+                    } @else {
+                        <p class="autopay-card__body">No upcoming bills scheduled within the next 7 days.</p>
+                    }
+                    <button class="autopay-card__btn" (click)="onWalletClick()">
+                        <span class="material-symbols-outlined">payments</span>
+                        Make a Payment
+                    </button>
+                </div>
+                <span class="material-symbols-outlined autopay-card__watermark">event_upcoming</span>
+            </div>
+
+            <!-- Total Outstanding -->
+            <div class="stats-card glass-card" *ngIf="billingSummary()">
+                <div class="stats-card__top">
+                    <span class="stats-card__label">TOTAL OUTSTANDING</span>
+                    <div class="stats-card__amount-row">
+                        <span class="stats-card__amount">Rs.{{ billingSummary().totalOutstanding || 0 }}</span>
+                        <span class="status-pill status-pill--pending">{{ billingSummary().pendingCount }} PENDING</span>
+                    </div>
+                </div>
+                <!-- Hidden fake paid ratio chart -->
+                <div class="stats-bar" style="display: none;"></div>
+            </div>
+        </div>
+    </main>
+</div>
+
+@if (showBillerModal()) {
+    <app-biller-form-modal
+        [billerName]="activeBillerName()"
+        [billerCategory]="activeBillerCategory()"
+        (closed)="onModalClosed()"
+        (paymentSuccess)="onModalClosed()"
+    />
+}
+
+<app-coming-soon />

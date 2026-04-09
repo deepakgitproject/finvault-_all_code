@@ -1,0 +1,258 @@
+services:
+  identity-db:
+    image: mcr.microsoft.com/mssql/server:2022-latest
+    container_name: identity-db
+    environment:
+      SA_PASSWORD: "Pass@word1"
+      ACCEPT_EULA: "Y"
+    ports:
+      - "1433:1433"
+    networks:
+      - finvault-net
+    healthcheck:
+      test: ["CMD-SHELL", "/opt/mssql-tools18/bin/sqlcmd -S localhost -U sa -P 'Pass@word1' -Q 'SELECT 1' -No"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 20s
+
+  rabbitmq:
+    image: rabbitmq:3-management
+    container_name: rabbitmq
+    ports:
+      - "5672:5672"
+      - "15672:15672"
+    environment:
+      RABBITMQ_DEFAULT_USER: guest
+      RABBITMQ_DEFAULT_PASS: guest
+    networks:
+      - finvault-net
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: redis:7-alpine
+    container_name: redis
+    ports:
+      - "6379:6379"
+    networks:
+      - finvault-net
+
+  identity-service:
+    build:
+      context: .
+      dockerfile: src/Services/IdentityService/IdentityService.API/Dockerfile
+    container_name: identity-service
+    dns:
+      - 8.8.8.8
+      - 8.8.4.4
+    ports:
+      - "5001:8080"
+    environment:
+      - ConnectionStrings__Default=Server=identity-db;Database=credvault_identity;User Id=sa;Password=Pass@word1;TrustServerCertificate=True;
+      - Jwt__SecretKey=ThisIsADevSecretKeyAtLeast32CharsLong!!
+      - Jwt__Issuer=finvault-identity
+      - Jwt__Audience=finvault-clients
+      - RabbitMQ__Host=rabbitmq
+      - RabbitMQ__Username=guest
+      - RabbitMQ__Password=guest
+      - ASPNETCORE_ENVIRONMENT=Development
+      - Email__SenderAddress=deepakyadav03917@gmail.com
+      - Email__SenderName=FinVault
+      - Email__AppPassword=hjuirptbednoyzbw
+    depends_on:
+      identity-db:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+    networks:
+      - finvault-net
+
+  billing-db:
+    image: mcr.microsoft.com/mssql/server:2022-latest
+    container_name: billing-db
+    environment:
+      SA_PASSWORD: "Pass@word1"
+      ACCEPT_EULA: "Y"
+    ports:
+      - "1434:1433"
+    networks:
+      - finvault-net
+    healthcheck:
+      test: ["CMD-SHELL", "/opt/mssql-tools18/bin/sqlcmd -S localhost -U sa -P 'Pass@word1' -Q 'SELECT 1' -No"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 20s
+
+  billing-service:
+    build:
+      context: .
+      dockerfile: src/Services/BillingService/BillingService.API/Dockerfile
+    container_name: billing-service
+    ports:
+      - "5003:8080"
+    environment:
+      - ConnectionStrings__Default=Server=billing-db;Database=credvault_billing;User Id=sa;Password=Pass@word1;TrustServerCertificate=True;
+      - Jwt__SecretKey=ThisIsADevSecretKeyAtLeast32CharsLong!!
+      - Jwt__Issuer=finvault-identity
+      - Jwt__Audience=finvault-clients
+      - RabbitMQ__Host=rabbitmq
+      - RabbitMQ__Username=guest
+      - RabbitMQ__Password=guest
+      - ASPNETCORE_ENVIRONMENT=Development
+    depends_on:
+      billing-db:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+    networks:
+      - finvault-net
+
+  card-db:
+    image: mcr.microsoft.com/mssql/server:2022-latest
+    container_name: card-db
+    environment:
+      SA_PASSWORD: "Pass@word1"
+      ACCEPT_EULA: "Y"
+    ports:
+      - "1435:1433"
+    networks:
+      - finvault-net
+    healthcheck:
+      test: ["CMD-SHELL", "/opt/mssql-tools18/bin/sqlcmd -S localhost -U sa -P 'Pass@word1' -Q 'SELECT 1' -No"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 20s
+
+  card-service:
+    build:
+      context: .
+      dockerfile: src/Services/CardService/CardService.API/Dockerfile
+    container_name: card-service
+    ports:
+      - "5002:8080"
+    environment:
+      - ConnectionStrings__Default=Server=card-db;Database=credvault_cards;User Id=sa;Password=Pass@word1;TrustServerCertificate=True;
+      - Jwt__SecretKey=ThisIsADevSecretKeyAtLeast32CharsLong!!
+      - Jwt__Issuer=finvault-identity
+      - Jwt__Audience=finvault-clients
+      - RabbitMQ__Host=rabbitmq
+      - RabbitMQ__Username=guest
+      - RabbitMQ__Password=guest
+      - ASPNETCORE_ENVIRONMENT=Development
+    depends_on:
+      card-db:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+    networks:
+      - finvault-net
+
+  payment-db:
+    image: mcr.microsoft.com/mssql/server:2022-latest
+    container_name: payment-db
+    environment:
+      SA_PASSWORD: "Pass@word1"
+      ACCEPT_EULA: "Y"
+    ports:
+      - "1436:1433"
+    networks:
+      - finvault-net
+    healthcheck:
+      test: ["CMD-SHELL", "/opt/mssql-tools18/bin/sqlcmd -S localhost -U sa -P 'Pass@word1' -Q 'SELECT 1' -No"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 20s
+
+  payment-service:
+    build:
+      context: .
+      dockerfile: src/Services/PaymentService/PaymentService.API/Dockerfile
+    container_name: payment-service
+    ports:
+      - "5004:8080"
+    environment:
+      - ConnectionStrings__Default=Server=payment-db;Database=credvault_payments;User Id=sa;Password=Pass@word1;TrustServerCertificate=True;
+      - Jwt__SecretKey=ThisIsADevSecretKeyAtLeast32CharsLong!!
+      - Jwt__Issuer=finvault-identity
+      - Jwt__Audience=finvault-clients
+      - RabbitMQ__Host=rabbitmq
+      - RabbitMQ__Username=guest
+      - RabbitMQ__Password=guest
+      - ASPNETCORE_ENVIRONMENT=Development
+    depends_on:
+      payment-db:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+    networks:
+      - finvault-net
+
+  notification-db:
+    image: mcr.microsoft.com/mssql/server:2022-latest
+    container_name: notification-db
+    environment:
+      SA_PASSWORD: "Pass@word1"
+      ACCEPT_EULA: "Y"
+    ports:
+      - "1437:1433"
+    networks:
+      - finvault-net
+    healthcheck:
+      test: ["CMD-SHELL", "/opt/mssql-tools18/bin/sqlcmd -S localhost -U sa -P 'Pass@word1' -Q 'SELECT 1' -No"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 20s
+
+  notification-service:
+    build:
+      context: .
+      dockerfile: src/Services/NotificationService/NotificationService.API/Dockerfile
+    container_name: notification-service
+    ports:
+      - "5005:8080"
+    environment:
+      - ConnectionStrings__Default=Server=notification-db;Database=credvault_notifications;User Id=sa;Password=Pass@word1;TrustServerCertificate=True;
+      - Jwt__SecretKey=ThisIsADevSecretKeyAtLeast32CharsLong!!
+      - Jwt__Issuer=finvault-identity
+      - Jwt__Audience=finvault-clients
+      - RabbitMQ__Host=rabbitmq
+      - RabbitMQ__Username=guest
+      - RabbitMQ__Password=guest
+      - ASPNETCORE_ENVIRONMENT=Development
+    depends_on:
+      notification-db:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+    networks:
+      - finvault-net
+
+  gateway:
+    build:
+      context: .
+      dockerfile: src/Services/Gateway/FinVault.Gateway/Dockerfile
+    container_name: gateway
+    ports:
+      - "5000:8080"
+    environment:
+      - ASPNETCORE_ENVIRONMENT=Development
+    depends_on:
+      - identity-service
+      - card-service
+      - billing-service
+      - payment-service
+      - notification-service
+    networks:
+      - finvault-net
+
+networks:
+  finvault-net:
+    driver: bridge
