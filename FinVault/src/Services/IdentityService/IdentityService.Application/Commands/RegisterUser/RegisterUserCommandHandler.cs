@@ -1,4 +1,4 @@
-﻿using MediatR;
+using MediatR;
 using IdentityService.Domain.Entities;
 using IdentityService.Domain.Interfaces;
 using IdentityService.Domain.Interfaces.Repositories;
@@ -22,7 +22,7 @@ public class RegisterUserCommandHandler(
     {
         // 1. Check duplicate email
         if (await userRepo.ExistsByEmailAsync(cmd.Email, ct))
-            return ApiResponse<AuthResponse>.Fail("Email is already registered.");
+            throw new FinVault.Shared.Exceptions.UserAlreadyExistsException("A user with this email already exists.");
 
         // 2. Hash password via IPasswordHasher
         var hash = passwordHasher.Hash(cmd.Password);

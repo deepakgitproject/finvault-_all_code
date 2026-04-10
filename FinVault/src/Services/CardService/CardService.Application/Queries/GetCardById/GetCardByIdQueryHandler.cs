@@ -3,6 +3,7 @@ using CardService.Domain.Entities;
 using CardService.Domain.Interfaces.Repositories;
 using FinVault.Shared.Contracts.Responses;
 using FinVault.Shared.Contracts.Card.Responses;
+using FinVault.Shared.Exceptions;
 
 namespace CardService.Application.Queries.GetCardById;
 
@@ -15,7 +16,7 @@ public class GetCardByIdQueryHandler(
     {
         var card = await cardRepo.GetByIdAsync(query.CardId, ct);
         if (card is null || card.IsDeleted)
-            return ApiResponse<CardResponse>.Fail("Card not found.");
+            throw new CardNotFoundException("The requested card could not be found.");
 
         return ApiResponse<CardResponse>.Ok(MapToResponse(card));
     }

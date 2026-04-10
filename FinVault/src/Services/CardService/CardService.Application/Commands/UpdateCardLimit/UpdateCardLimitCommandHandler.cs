@@ -1,6 +1,7 @@
 using MediatR;
 using CardService.Domain.Interfaces.Repositories;
 using FinVault.Shared.Contracts.Responses;
+using FinVault.Shared.Exceptions;
 
 namespace CardService.Application.Commands.UpdateCardLimit;
 
@@ -13,11 +14,11 @@ public class UpdateCardLimitCommandHandler(
     {
         var card = await cardRepo.GetByIdAsync(cmd.CardId, ct);
         if (card is null || card.IsDeleted)
-            return ApiResponse<bool>.Fail("Card not found.");
+            throw new CardNotFoundException("The requested card could not be found.");
 
         if (cmd.NewLimit < card.OutstandingBalance)
             return ApiResponse<bool>.Fail(
-                $"New limit (₹{cmd.NewLimit:N2}) cannot be less than outstanding balance (₹{card.OutstandingBalance:N2}).");
+                $"New limit cannot be less than outstanding balance.");
 
         card.UpdateLimit(cmd.NewLimit);
         cardRepo.Update(card);

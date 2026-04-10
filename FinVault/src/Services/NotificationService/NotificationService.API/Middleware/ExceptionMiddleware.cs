@@ -1,4 +1,5 @@
 using FinVault.Shared.Contracts.Responses;
+using FinVault.Shared.Exceptions;
 using FluentValidation;
 
 namespace NotificationService.API.Middleware;
@@ -24,17 +25,27 @@ public class ExceptionMiddleware(RequestDelegate next, ILogger<ExceptionMiddlewa
             await ctx.Response.WriteAsJsonAsync(
                 ApiResponse<object>.Fail("Validation failed.", errors));
         }
-        catch (UnauthorizedAccessException ex)
+        catch (NotificationNotFoundException ex)
+        {
+            logger.LogWarning("Notification not found: {Message}", ex.Message);
+            ctx.Response.StatusCode = 404;
+            ctx.Response.ContentType = "application/json";
+            await ctx.Response.WriteAsJsonAsync(
+                ApiResponse<object>.Fail("The requested notification could not be found."));
+        }
+        catch (UnauthorizedAccessException)
         {
             ctx.Response.StatusCode = 401;
             ctx.Response.ContentType = "application/json";
-            await ctx.Response.WriteAsJsonAsync(ApiResponse<object>.Fail(ex.Message));
+            await ctx.Response.WriteAsJsonAsync(
+                ApiResponse<object>.Fail("You are not authorized to perform this action."));
         }
-        catch (KeyNotFoundException ex)
+        catch (KeyNotFoundException)
         {
             ctx.Response.StatusCode = 404;
             ctx.Response.ContentType = "application/json";
-            await ctx.Response.WriteAsJsonAsync(ApiResponse<object>.Fail(ex.Message));
+            await ctx.Response.WriteAsJsonAsync(
+                ApiResponse<object>.Fail("The requested resource could not be found."));
         }
         catch (Exception ex)
         {

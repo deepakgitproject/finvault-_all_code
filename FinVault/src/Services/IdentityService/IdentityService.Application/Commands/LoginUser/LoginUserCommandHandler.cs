@@ -1,4 +1,4 @@
-﻿using MediatR;
+using MediatR;
 using IdentityService.Domain.Entities;
 using IdentityService.Domain.Interfaces;
 using IdentityService.Domain.Interfaces.Repositories;
@@ -20,7 +20,7 @@ public class LoginUserCommandHandler(
 
         // Same error message for both cases — do not reveal which one failed (security)
         if (user is null || !passwordHasher.Verify(cmd.Password, user.PasswordHash))
-            return ApiResponse<AuthResponse>.Fail("Invalid email or password.");
+            throw new FinVault.Shared.Exceptions.InvalidCredentialsException("Invalid email or password.");
 
         if (!user.IsActive)
             return ApiResponse<AuthResponse>.Fail("Account is disabled. Contact support.");

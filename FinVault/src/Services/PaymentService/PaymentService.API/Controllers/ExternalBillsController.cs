@@ -5,6 +5,7 @@ using Microsoft.AspNetCore.Mvc;
 using PaymentService.Application.Commands.InitiateExternalBillPayment;
 using PaymentService.Application.Commands.CompleteExternalBillPayment;
 using PaymentService.Application.Queries.GetExternalBillPayments;
+using FinVault.Shared.Exceptions;
 
 namespace PaymentService.API.Controllers;
 
@@ -15,7 +16,7 @@ public class ExternalBillsController(ISender mediator) : ControllerBase
 {
     private Guid GetUserId() =>
         Guid.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)
-            ?? throw new UnauthorizedAccessException("User ID not found in token."));
+            ?? throw new InvalidTokenException("User ID not found in token."));
 
     /// <summary>Initiate a new external bill payment</summary>
     [HttpPost("pay")]

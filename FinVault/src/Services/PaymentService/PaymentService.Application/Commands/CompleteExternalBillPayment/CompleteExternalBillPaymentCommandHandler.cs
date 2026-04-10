@@ -5,6 +5,7 @@ using PaymentService.Domain.Interfaces.Repositories;
 using Microsoft.Extensions.Logging;
 using FinVault.Shared.Contracts.Responses;
 using FinVault.Shared.Contracts.Payment.Events;
+using FinVault.Shared.Exceptions;
 
 namespace PaymentService.Application.Commands.CompleteExternalBillPayment;
 
@@ -20,24 +21,23 @@ public class CompleteExternalBillPaymentCommandHandler(
         CompleteExternalBillPaymentCommand cmd, CancellationToken ct)
     {
         var payment = await paymentRepo.GetByIdAsync(cmd.PaymentId, ct);
-        
+
         if (payment is null)
-            return ApiResponse<bool>.Fail("Payment not found.");
-            
+            throw new PaymentNotFoundException("The requested payment could not be found.");
+
         if (payment.IsCompleted)
-            return ApiResponse<bool>.Fail("Payment is already completed.");
-            
+            throw new PaymentAlreadyCompletedException("This payment is already completed.");
+
         if (payment.Status == "Failed")
-            return ApiResponse<bool>.Fail("Payment has already failed.");
+            throw new TransactionFailedException("This payment has already failed.");
 
         if (payment.IsOtpExpired)
-            return ApiResponse<bool>.Fail("OTP has expired. Please initiate payment again.");
+            throw new OTPVerificationFailedException("OTP has expired. Please initiate payment again.");
 
         if (string.IsNullOrEmpty(payment.OtpHash) || !otpHasher.Verify(cmd.OtpCode, payment.OtpHash))
         {
-            logger.LogWarning("OTP Verification failed for Payment {PaymentId}. Entered Code: {OtpCode}, Stored Hash Start: {HashStart}", 
-                cmd.PaymentId, cmd.OtpCode, payment.OtpHash?.Substring(0, 5));
-            return ApiResponse<bool>.Fail("Invalid OTP code.");
+            logger.LogWarning("OTP verification failed for Payment {PaymentId}", cmd.PaymentId);
+            throw new OTPVerificationFailedException("Invalid OTP code. Please try again.");
         }
 
         payment.Complete();

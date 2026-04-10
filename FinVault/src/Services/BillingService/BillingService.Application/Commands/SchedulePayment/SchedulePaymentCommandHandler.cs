@@ -2,6 +2,7 @@ using MediatR;
 using BillingService.Domain.Entities;
 using BillingService.Domain.Interfaces.Repositories;
 using FinVault.Shared.Contracts.Responses;
+using FinVault.Shared.Exceptions;
 
 namespace BillingService.Application.Commands.SchedulePayment;
 
@@ -16,13 +17,13 @@ public class SchedulePaymentCommandHandler(
         // 1. Validate bill exists
         var bill = await billRepo.GetByIdAsync(cmd.BillId, ct);
         if (bill is null || bill.IsDeleted)
-            return ApiResponse<SchedulePaymentResponse>.Fail("Bill not found.");
+            throw new BillNotFoundException("The requested bill could not be found.");
 
         if (bill.Status == "Paid")
-            return ApiResponse<SchedulePaymentResponse>.Fail("Bill is already fully paid.");
+            throw new InvalidBillStatusException("This bill is already fully paid.");
 
         if (bill.UserId != cmd.UserId)
-            return ApiResponse<SchedulePaymentResponse>.Fail("Bill does not belong to this user.");
+            throw new UnauthorizedAccessException("You can only manage bills that belong to you.");
 
         // 2. Create schedule via factory method
         var schedule = PaymentSchedule.Create(cmd.BillId, cmd.UserId,

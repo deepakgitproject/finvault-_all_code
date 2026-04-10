@@ -1,6 +1,7 @@
 using MediatR;
 using CardService.Domain.Interfaces.Repositories;
 using FinVault.Shared.Contracts.Responses;
+using FinVault.Shared.Exceptions;
 
 namespace CardService.Application.Commands.RemoveCard;
 
@@ -13,7 +14,7 @@ public class RemoveCardCommandHandler(
     {
         var card = await cardRepo.GetByIdAsync(cmd.CardId, ct);
         if (card is null || card.IsDeleted)
-            return ApiResponse<bool>.Fail("Card not found or already deleted.");
+            throw new CardNotFoundException("The card could not be found or has already been removed.");
 
         card.SoftDelete();
         cardRepo.Update(card);

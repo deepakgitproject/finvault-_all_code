@@ -1,5 +1,6 @@
 using MediatR;
 using FinVault.Shared.Contracts.Responses;
+using FinVault.Shared.Exceptions;
 using NotificationService.Domain.Interfaces.Repositories;
 
 namespace NotificationService.Application.Commands.MarkNotificationRead;
@@ -13,7 +14,7 @@ public class MarkNotificationReadCommandHandler(
     {
         var notification = await repo.GetByIdAsync(request.NotificationId, ct);
         if (notification is null)
-            return ApiResponse<bool>.Fail("Notification not found.");
+            throw new NotificationNotFoundException($"Notification with ID {request.NotificationId} was not found.");
 
         notification.MarkAsRead();
         repo.Update(notification);

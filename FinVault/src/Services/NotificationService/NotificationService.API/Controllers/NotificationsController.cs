@@ -45,7 +45,7 @@ public class NotificationsController(ISender mediator) : ControllerBase
     {
         var cmd = new MarkNotificationReadCommand(notificationId);
         var result = await mediator.Send(cmd, ct);
-        return result.Success ? Ok(result) : NotFound(result);
+        return Ok(result);
     }
 
     /// <summary>Mark all notifications as read for a user</summary>

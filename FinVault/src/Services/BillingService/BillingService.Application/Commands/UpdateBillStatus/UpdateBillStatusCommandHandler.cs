@@ -2,6 +2,7 @@ using MediatR;
 using BillingService.Domain.Interfaces.Repositories;
 using FinVault.Shared.Contracts.Responses;
 using FinVault.Shared.Contracts.Billing.Responses;
+using FinVault.Shared.Exceptions;
 
 namespace BillingService.Application.Commands.UpdateBillStatus;
 
@@ -16,12 +17,12 @@ public class UpdateBillStatusCommandHandler(
         UpdateBillStatusCommand cmd, CancellationToken ct)
     {
         if (!ValidStatuses.Contains(cmd.Status))
-            return ApiResponse<BillResponse>.Fail(
+            throw new InvalidBillStatusException(
                 $"Invalid status '{cmd.Status}'. Must be one of: {string.Join(", ", ValidStatuses)}");
 
         var bill = await billRepo.GetByIdAsync(cmd.BillId, ct);
         if (bill is null || bill.IsDeleted)
-            return ApiResponse<BillResponse>.Fail("Bill not found.");
+            throw new BillNotFoundException("The requested bill could not be found.");
 
         // Apply status change via domain methods
         switch (cmd.Status)
@@ -34,8 +35,8 @@ public class UpdateBillStatusCommandHandler(
                 break;
             default:
                 // For Pending/PartiallyPaid, we just validate — actual status is driven by payments
-                return ApiResponse<BillResponse>.Fail(
-                    "Status is automatically managed. Use Overdue or Paid.");
+                throw new InvalidBillStatusException(
+                    "Bill status is automatically managed by payments. Use Overdue or Paid.");
         }
 
         billRepo.Update(bill);

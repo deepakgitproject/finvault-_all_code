@@ -8,6 +8,7 @@ using PaymentService.Application.Commands.CompletePayment;
 using PaymentService.Application.Commands.ReversePayment;
 using PaymentService.Application.Queries.GetPayments;
 using PaymentService.Application.Queries.GetPaymentById;
+using FinVault.Shared.Exceptions;
 
 namespace PaymentService.API.Controllers;
 
@@ -19,7 +20,7 @@ public class PaymentsController(ISender mediator) : ControllerBase
 {
     private Guid GetUserId() =>
         Guid.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)
-            ?? throw new UnauthorizedAccessException("User ID not found in token."));
+            ?? throw new InvalidTokenException("User ID not found in token."));
 
     /// <summary>Initiate a new payment</summary>
     [HttpPost]

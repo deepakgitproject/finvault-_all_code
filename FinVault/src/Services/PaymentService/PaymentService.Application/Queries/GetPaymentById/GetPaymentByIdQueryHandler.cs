@@ -2,6 +2,7 @@ using MediatR;
 using PaymentService.Domain.Interfaces.Repositories;
 using FinVault.Shared.Contracts.Responses;
 using FinVault.Shared.Contracts.Payment.Responses;
+using FinVault.Shared.Exceptions;
 
 namespace PaymentService.Application.Queries.GetPaymentById;
 
@@ -16,7 +17,7 @@ public class GetPaymentByIdQueryHandler(
     {
         var p = await paymentRepo.GetByIdAsync(query.PaymentId, ct);
         if (p is null || p.IsDeleted)
-            return ApiResponse<PaymentResponse>.Fail("Payment not found.");
+            throw new PaymentNotFoundException("The requested payment could not be found.");
 
         var saga = await sagaRepo.GetByPaymentIdAsync(p.Id, ct);
         var risk = await riskRepo.GetByPaymentIdAsync(p.Id, ct);

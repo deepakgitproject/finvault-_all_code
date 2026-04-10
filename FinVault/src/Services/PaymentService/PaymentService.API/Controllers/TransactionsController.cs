@@ -5,6 +5,7 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using PaymentService.Application.Queries.GetTransactions;
 using PaymentService.Application.Queries.GetRiskScore;
+using FinVault.Shared.Exceptions;
 
 namespace PaymentService.API.Controllers;
 
@@ -16,7 +17,7 @@ public class TransactionsController(ISender mediator) : ControllerBase
 {
     private Guid GetUserId() =>
         Guid.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)
-            ?? throw new UnauthorizedAccessException("User ID not found in token."));
+            ?? throw new InvalidTokenException("User ID not found in token."));
 
     /// <summary>Get all transactions for the current user</summary>
     [HttpGet]

@@ -3,12 +3,15 @@ using CardService.Domain.Interfaces;
 using CardService.Domain.Interfaces.Repositories;
 using FinVault.Shared.Contracts.Responses;
 using FinVault.Shared.Contracts.Card.Responses;
+using FinVault.Shared.Exceptions;
+using Microsoft.Extensions.Logging;
 
 namespace CardService.Application.Queries.RevealCard;
 
 public class RevealCardHandler(
     ICreditCardRepository cardRepo,
-    ICardEncryptionService encryptionService
+    ICardEncryptionService encryptionService,
+    ILogger<RevealCardHandler> logger
 ) : IRequestHandler<RevealCardQuery, ApiResponse<RevealCardResponse>>
 {
     public async Task<ApiResponse<RevealCardResponse>> Handle(
@@ -17,7 +20,7 @@ public class RevealCardHandler(
         var card = await cardRepo.GetByIdAsync(query.CardId, ct);
 
         if (card is null || card.UserId != query.UserId || card.IsDeleted)
-            return ApiResponse<RevealCardResponse>.Fail("Card not found.");
+            throw new CardNotFoundException("The requested card could not be found.");
 
         try
         {
@@ -37,9 +40,10 @@ public class RevealCardHandler(
 
             return ApiResponse<RevealCardResponse>.Ok(response);
         }
-        catch (Exception)
+        catch (Exception ex)
         {
-            return ApiResponse<RevealCardResponse>.Fail("Failed to decrypt card details.");
+            logger.LogError(ex, "Failed to decrypt card details for Card {CardId}", query.CardId);
+            throw new CardDecryptionFailedException("Failed to decrypt card details. Please try again.", ex);
         }
     }
 }

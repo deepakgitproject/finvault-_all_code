@@ -4,6 +4,7 @@ using PaymentService.Domain.Interfaces;
 using PaymentService.Domain.Interfaces.Repositories;
 using FinVault.Shared.Contracts.Responses;
 using FinVault.Shared.Contracts.Payment.Events;
+using FinVault.Shared.Exceptions;
 
 namespace PaymentService.Application.Commands.CompletePayment;
 
@@ -19,18 +20,18 @@ public class CompletePaymentCommandHandler(
     {
         var payment = await paymentRepo.GetByIdAsync(cmd.PaymentId, ct);
         if (payment is null)
-            return ApiResponse<bool>.Fail("Payment not found.");
+            throw new PaymentNotFoundException("The requested payment could not be found.");
         if (payment.IsCompleted)
-            return ApiResponse<bool>.Fail("Payment already completed.");
+            throw new PaymentAlreadyCompletedException("This payment is already completed.");
         if (payment.IsFailed)
-            return ApiResponse<bool>.Fail("Cannot complete a failed payment.");
+            throw new TransactionFailedException("Cannot complete a failed payment.");
 
-        // OTP Verification removed for card bill payments 
+        // OTP Verification removed for card bill payments
         // Just verify saga exists and complete the payment flow if it was in Initiated state
 
         var saga = await sagaRepo.GetByPaymentIdAsync(payment.Id, ct);
         if (saga is null)
-            return ApiResponse<bool>.Fail("Payment saga not found.");
+            throw new PaymentSagaNotFoundException("Payment saga not found.");
 
         saga.StartProcessing();
         payment.Complete();

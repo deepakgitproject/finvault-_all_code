@@ -1,6 +1,7 @@
 using MediatR;
 using BillingService.Domain.Interfaces.Repositories;
 using FinVault.Shared.Contracts.Responses;
+using FinVault.Shared.Exceptions;
 
 namespace BillingService.Application.Commands.CancelSchedule;
 
@@ -13,11 +14,11 @@ public class CancelScheduleCommandHandler(
     {
         var schedule = await scheduleRepo.GetByIdAsync(cmd.ScheduleId, ct);
         if (schedule is null)
-            return ApiResponse<string>.Fail("Payment schedule not found.");
+            throw new PaymentScheduleNotFoundException("The requested payment schedule could not be found.");
 
         if (schedule.Status != "Pending")
-            return ApiResponse<string>.Fail(
-                $"Cannot cancel schedule with status '{schedule.Status}'. Only Pending schedules can be cancelled.");
+            throw new InvalidBillStatusException(
+                $"Cannot cancel schedule with status '{schedule.Status}'. Only pending schedules can be cancelled.");
 
         schedule.Cancel();
         scheduleRepo.Update(schedule);

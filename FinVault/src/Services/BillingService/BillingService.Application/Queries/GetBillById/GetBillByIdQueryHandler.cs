@@ -3,6 +3,7 @@ using BillingService.Domain.Entities;
 using BillingService.Domain.Interfaces.Repositories;
 using FinVault.Shared.Contracts.Responses;
 using FinVault.Shared.Contracts.Billing.Responses;
+using FinVault.Shared.Exceptions;
 
 namespace BillingService.Application.Queries.GetBillById;
 
@@ -15,7 +16,7 @@ public class GetBillByIdQueryHandler(
     {
         var bill = await billRepo.GetByIdAsync(query.BillId, ct);
         if (bill is null || bill.IsDeleted)
-            return ApiResponse<BillResponse>.Fail("Bill not found.");
+            throw new BillNotFoundException("The requested bill could not be found.");
 
         return ApiResponse<BillResponse>.Ok(MapToResponse(bill));
     }

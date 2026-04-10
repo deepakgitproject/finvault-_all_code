@@ -1,6 +1,7 @@
 using MediatR;
 using CardService.Domain.Interfaces.Repositories;
 using FinVault.Shared.Contracts.Responses;
+using FinVault.Shared.Exceptions;
 
 namespace CardService.Application.Commands.VerifyCard;
 
@@ -13,10 +14,10 @@ public class VerifyCardCommandHandler(
     {
         var card = await cardRepo.GetByIdAsync(cmd.CardId, ct);
         if (card is null || card.IsDeleted)
-            return ApiResponse<bool>.Fail("Card not found.");
+            throw new CardNotFoundException("The requested card could not be found.");
 
         if (card.IsVerified)
-            return ApiResponse<bool>.Fail("Card is already verified.");
+            throw new CardAlreadyVerifiedException("This card is already verified.");
 
         card.Verify();
         cardRepo.Update(card);

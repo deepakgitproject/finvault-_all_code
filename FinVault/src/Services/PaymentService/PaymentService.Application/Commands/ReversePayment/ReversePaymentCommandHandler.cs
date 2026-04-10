@@ -4,6 +4,7 @@ using PaymentService.Domain.Interfaces;
 using PaymentService.Domain.Interfaces.Repositories;
 using FinVault.Shared.Contracts.Responses;
 using FinVault.Shared.Contracts.Payment.Events;
+using FinVault.Shared.Exceptions;
 
 namespace PaymentService.Application.Commands.ReversePayment;
 
@@ -19,9 +20,9 @@ public class ReversePaymentCommandHandler(
     {
         var payment = await paymentRepo.GetByIdAsync(cmd.PaymentId, ct);
         if (payment is null)
-            return ApiResponse<bool>.Fail("Payment not found.");
+            throw new PaymentNotFoundException("The requested payment could not be found.");
         if (!payment.IsCompleted)
-            return ApiResponse<bool>.Fail("Only completed payments can be reversed.");
+            throw new InvalidBillStatusException("Only completed payments can be reversed.");
 
         payment.Reverse();
 

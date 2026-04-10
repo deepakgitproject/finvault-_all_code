@@ -12,6 +12,7 @@ using CardService.Application.Queries.GetCards;
 using CardService.Application.Queries.GetCardById;
 using CardService.Application.Queries.GetCardUtilization;
 using CardService.Application.Queries.RevealCard;
+using FinVault.Shared.Exceptions;
 
 namespace CardService.API.Controllers;
 
@@ -23,7 +24,7 @@ public class CardsController(ISender mediator) : ControllerBase
 {
     private Guid GetUserId() =>
         Guid.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)
-            ?? throw new UnauthorizedAccessException("User ID not found in token."));
+            ?? throw new InvalidTokenException("User ID not found in token."));
 
 
     /// <summary>Add a new credit card</summary>

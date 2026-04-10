@@ -5,6 +5,7 @@ using BillingService.Domain.Interfaces.Repositories;
 using FinVault.Shared.Contracts.Responses;
 using FinVault.Shared.Contracts.Billing.Responses;
 using FinVault.Shared.Contracts.Billing.Events;
+using FinVault.Shared.Exceptions;
 
 namespace BillingService.Application.Commands.GenerateBill;
 
@@ -18,8 +19,8 @@ public class GenerateBillCommandHandler(
     {
         // 1. Check for duplicate bill
         if (await billRepo.ExistsAsync(cmd.UserId, cmd.CardId, cmd.BillingMonth, ct))
-            return ApiResponse<BillResponse>.Fail(
-                $"Bill already exists for card {cmd.CardId} in {cmd.BillingMonth}.");
+            throw new BillAlreadyExistsException(
+                $"A bill already exists for this card in {cmd.BillingMonth}.");
 
         // 2. Create domain entity via factory method
         var bill = Bill.Create(cmd.UserId, cmd.CardId, cmd.TotalAmount,

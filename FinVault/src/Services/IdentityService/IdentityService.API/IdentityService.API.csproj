@@ -18,6 +18,7 @@
   <ItemGroup>
     <ProjectReference Include="..\IdentityService.Application\IdentityService.Application.csproj" />
     <ProjectReference Include="..\IdentityService.Infrastructure\IdentityService.Infrastructure.csproj" />
+    <ProjectReference Include="..\..\..\Shared\FinVault.Shared\FinVault.Shared.csproj" />
   </ItemGroup>
 
 </Project>
