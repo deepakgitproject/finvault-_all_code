@@ -65,18 +65,40 @@ body {
   font-family: "DM Sans", sans-serif;
   font-size: 16px;
   zoom: 0.9;
+  scroll-behavior: smooth;
+  overflow-x: hidden;
 }
 html body,
 body body {
   background:
     linear-gradient(
-      to left,
-      #b4acf6 0%,
-      #c6bcf5 25%,
-      #d1caf0 45%,
-      #e4dbf8 60%,
-      #ffffff 100%);
+      -45deg,
+      #b4acf6,
+      #c6bcf5,
+      #d1caf0,
+      #ffffff);
+  background-size: 400% 400%;
+  animation: gradientBG 15s ease infinite;
   min-height: 100vh;
+}
+@keyframes gradientBG {
+  0% {
+    background-position: 0% 50%;
+  }
+  50% {
+    background-position: 100% 50%;
+  }
+  100% {
+    background-position: 0% 50%;
+  }
+}
+html html,
+body html {
+  scroll-behavior: smooth;
+}
+html body.vanta-active,
+body body.vanta-active {
+  background: #23153c !important;
 }
 html,
 body {
@@ -202,39 +224,6 @@ body {
   letter-spacing: 0.12em;
   text-transform: uppercase;
   color: var(--text-muted);
-}
-.bg-blobs {
-  position: fixed;
-  inset: 0;
-  z-index: 0;
-  overflow: hidden;
-  pointer-events: none;
-}
-.bg-blobs .blob {
-  position: absolute;
-  border-radius: 50%;
-  filter: blur(80px);
-}
-.bg-blobs .blob.blob-1 {
-  width: 600px;
-  height: 600px;
-  top: -100px;
-  left: -150px;
-  background: var(--bg-blob-1);
-}
-.bg-blobs .blob.blob-2 {
-  width: 500px;
-  height: 500px;
-  top: 40%;
-  right: -100px;
-  background: var(--bg-blob-2);
-}
-.bg-blobs .blob.blob-3 {
-  width: 400px;
-  height: 400px;
-  bottom: -80px;
-  left: 35%;
-  background: var(--bg-blob-3);
 }
 
 /* angular:styles/global:styles */

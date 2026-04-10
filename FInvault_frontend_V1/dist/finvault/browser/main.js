@@ -3,7 +3,7 @@ import {
   ResetBusService,
   TokenService,
   environment
-} from "./chunk-4SYUYOJR.js";
+} from "./chunk-YHSV5YO4.js";
 import {
   BehaviorSubject,
   Component,
@@ -26,7 +26,8 @@ import {
   ɵsetClassDebugInfo,
   ɵɵdefineComponent,
   ɵɵelement
-} from "./chunk-SYL3PSAO.js";
+} from "./chunk-7LXNCHVZ.js";
+import "./chunk-46DXP6YY.js";
 
 // src/app/core/guards/auth.guard.ts
 var authGuard = () => {
@@ -42,60 +43,60 @@ var authGuard = () => {
 var routes = [
   {
     path: "",
-    loadComponent: () => import("./chunk-DDAIJBI7.js").then((m) => m.HomeComponent)
+    loadComponent: () => import("./chunk-UE3D5KPZ.js").then((m) => m.HomeComponent)
   },
   // -- Auth (no guard) ------------------------------------------
   {
     path: "auth/login",
-    loadComponent: () => import("./chunk-VSAVQ7TF.js").then((m) => m.LoginComponent)
+    loadComponent: () => import("./chunk-LHH5A3O6.js").then((m) => m.LoginComponent)
   },
   {
     path: "auth/register",
-    loadComponent: () => import("./chunk-M267I5R4.js").then((m) => m.RegisterComponent)
+    loadComponent: () => import("./chunk-NAYUVQ3C.js").then((m) => m.RegisterComponent)
   },
   {
     path: "auth/forgot-password",
-    loadComponent: () => import("./chunk-GSUCNXAF.js").then((m) => m.ForgotPasswordComponent)
+    loadComponent: () => import("./chunk-4TITFVXT.js").then((m) => m.ForgotPasswordComponent)
   },
   {
     path: "auth/reset-password",
-    loadComponent: () => import("./chunk-MY4ZZ5X5.js").then((m) => m.ResetPasswordComponent)
+    loadComponent: () => import("./chunk-3OKS42SH.js").then((m) => m.ResetPasswordComponent)
   },
   // -- Protected routes -----------------------------------------
   {
     path: "dashboard",
     canActivate: [authGuard],
-    loadComponent: () => import("./chunk-TL5DU7XQ.js").then((m) => m.DashboardComponent)
+    loadComponent: () => import("./chunk-X5IDSVWD.js").then((m) => m.DashboardComponent)
   },
   {
     path: "cards",
     canActivate: [authGuard],
-    loadComponent: () => import("./chunk-7W2IOFJS.js").then((m) => m.CardsComponent)
+    loadComponent: () => import("./chunk-YHVLSUH3.js").then((m) => m.CardsComponent)
   },
   {
     path: "bills",
     canActivate: [authGuard],
-    loadComponent: () => import("./chunk-ZYCLXGBF.js").then((m) => m.BillsComponent)
+    loadComponent: () => import("./chunk-ZNZWCC5T.js").then((m) => m.BillsComponent)
   },
   {
     path: "payments",
     canActivate: [authGuard],
-    loadComponent: () => import("./chunk-3LY6HXRD.js").then((m) => m.PayBillComponent)
+    loadComponent: () => import("./chunk-V45MS4K3.js").then((m) => m.PaymentPageComponent)
   },
   {
     path: "notifications",
     canActivate: [authGuard],
-    loadComponent: () => import("./chunk-PEFPDHNQ.js").then((m) => m.NotificationsComponent)
+    loadComponent: () => import("./chunk-5ZO7U3XQ.js").then((m) => m.NotificationsComponent)
   },
   {
     path: "transactions",
     canActivate: [authGuard],
-    loadComponent: () => import("./chunk-BP2MK6SG.js").then((m) => m.TransactionsComponent)
+    loadComponent: () => import("./chunk-P65TBUQY.js").then((m) => m.TransactionsComponent)
   },
   {
     path: "profile",
     canActivate: [authGuard],
-    loadComponent: () => import("./chunk-QCKIVZDZ.js").then((m) => m.ProfileComponent)
+    loadComponent: () => import("./chunk-V7N2RY3S.js").then((m) => m.ProfileComponent)
   },
   {
     path: "**",
