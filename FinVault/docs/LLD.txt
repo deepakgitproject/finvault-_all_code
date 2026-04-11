@@ -1,0 +1,1410 @@
+================================================================================
+                    FinVault - Low Level Design (LLD) Document
+                    Credit Card Management System
+================================================================================
+
+Version: 1.0
+Last Updated: April 11, 2026
+Prepared By: Development Team
+Status: Final
+
+================================================================================
+                          TABLE OF CONTENTS
+================================================================================
+
+1. Introduction
+2. Architecture Overview
+3. Identity Service - Detailed Design
+4. Card Service - Detailed Design
+5. Payment Service - Detailed Design
+6. Billing Service - Detailed Design
+7. Notification Service - Detailed Design
+8. API Gateway - Detailed Design
+9. Database Schema Design
+10. API Contracts
+11. Class Diagrams
+12. Sequence Diagrams
+13. State Machines
+14. Error Handling Implementation
+15. Testing Strategy
+
+================================================================================
+                          1. INTRODUCTION
+================================================================================
+
+1.1 Purpose
+----------
+This Low Level Design (LLD) document provides detailed implementation-level
+design of FinVault system components. It describes classes, methods, data
+structures, algorithms, and implementation details for each microservice.
+
+1.2 Scope
+---------
+This document covers:
+  - Class-level design for all services
+  - Method signatures and responsibilities
+  - Data structures and DTOs
+  - Database table schemas
+  - API endpoint specifications
+  - Sequence diagrams for key flows
+  - State machines for entities
+  - Error handling implementation
+  - Testing approach
+
+1.3 Relationship to HLD
+------------------------
+The HLD describes the system architecture at a high level. This LLD provides
+the detailed design needed for implementation. Readers should review the HLD
+first for architectural context.
+
+================================================================================
+                          2. ARCHITECTURE OVERVIEW
+================================================================================
+
+2.1 Clean Architecture Pattern
+-------------------------------
+Each service follows Clean Architecture (Onion Architecture) with 4 layers:
+
+  Layer 1: Domain (Core)
+    - Entities (business objects with behavior)
+    - Value Objects (immutable objects)
+    - Domain Interfaces (contracts)
+    - Domain Exceptions (custom exceptions)
+    Dependencies: None (pure .NET)
+
+  Layer 2: Application
+    - Commands (write operations via MediatR)
+    - Queries (read operations via MediatR)
+    - Validators (FluentValidation)
+    - Behaviors (pipeline behaviors)
+    - DTOs (data transfer objects)
+    Dependencies: Domain
+
+  Layer 3: Infrastructure
+    - DbContext (EF Core database context)
+    - Repositories (data access implementations)
+    - Services (external service implementations)
+    - Messaging (RabbitMQ publishers/consumers)
+    - Migrations (EF Core migrations)
+    Dependencies: Domain, Application
+
+  Layer 4: API (Presentation)
+    - Controllers (HTTP endpoints)
+    - Middleware (exception handling, logging)
+    - Program.cs (DI configuration)
+    Dependencies: Application, Infrastructure
+
+2.2 CQRS Pattern
+-----------------
+Command Query Responsibility Segregation:
+  - Commands: Write operations that change state (Create, Update, Delete)
+  - Queries: Read operations that return data (Get, List)
+  - Handlers: Process commands/queries and return results
+  - Validators: Validate commands before handlers execute
+
+2.3 Dependency Injection
+-------------------------
+All dependencies injected via constructor:
+  - Services: Scoped (per HTTP request)
+  - DbContext: Scoped
+  - Repositories: Scoped
+  - Event Publishers: Scoped
+  - Configuration: Singleton
+
+================================================================================
+                          3. IDENTITY SERVICE - DETAILED DESIGN
+================================================================================
+
+3.1 Domain Layer
+-----------------
+
+Entity: User
+  File: IdentityService.Domain/Entities/User.cs
+  
+  Properties:
+    - Guid Id { get; private set; }
+    - string Email { get; private set; }
+    - string PasswordHash { get; private set; }
+    - string FirstName { get; private set; }
+    - string LastName { get; private set; }
+    - string Role { get; private set; } = "User"
+    - bool IsEmailVerified { get; private set; }
+    - bool IsActive { get; private set; }
+    - DateTimeOffset CreatedAt { get; private set; }
+    - DateTimeOffset? UpdatedAt { get; private set; }
+  
+  Computed Properties:
+    - string FullName => $"{FirstName} {LastName}"
+  
+  Factory Methods:
+    - static User Create(email, passwordHash, firstName, lastName)
+      Validates: email not empty, passwordHash not empty
+      Sets: Email (lowercase, trimmed), timestamps
+  
+  Business Methods:
+    - void VerifyEmail()
+      Sets: IsEmailVerified = true, UpdatedAt
+    - void UpdatePassword(newHash)
+      Validates: newHash not empty
+      Sets: PasswordHash, UpdatedAt
+    - void UpdateProfile(firstName, lastName)
+      Sets: FirstName, LastName (trimmed), UpdatedAt
+    - void Deactivate()
+      Sets: IsActive = false, UpdatedAt
+
+Entity: OTPCode
+  File: IdentityService.Domain/Entities/OTPCode.cs
+  
+  Properties:
+    - Guid Id
+    - Guid UserId
+    - string CodeHash (BCrypt hashed OTP)
+    - string Purpose (EmailVerification | PasswordReset)
+    - DateTimeOffset ExpiresAt
+    - bool IsUsed
+    - DateTimeOffset CreatedAt
+  
+  Computed:
+    - bool IsExpired => DateTimeOffset.UtcNow >= ExpiresAt
+    - bool IsValid => !IsUsed && !IsExpired
+  
+  Factory:
+    - static OTPCode Create(userId, codeHash, purpose)
+      Sets: ExpiresAt = UtcNow + 5 minutes
+  
+  Methods:
+    - void MarkUsed() => IsUsed = true
+
+Entity: RefreshToken
+  File: IdentityService.Domain/Entities/RefreshToken.cs
+  
+  Properties:
+    - Guid Id
+    - Guid UserId
+    - string Token (SHA-256 hash)
+    - DateTimeOffset ExpiresAt
+    - bool IsRevoked
+    - DateTimeOffset CreatedAt
+    - User? User (navigation)
+  
+  Computed:
+    - bool IsExpired => UtcNow >= ExpiresAt
+    - bool IsActive => !IsRevoked && !IsExpired
+  
+  Factory:
+    - static RefreshToken Create(userId, hashedToken, validDays=7)
+  
+  Methods:
+    - void Revoke() => IsRevoked = true
+
+Domain Interfaces:
+  - IUserRepository: GetById, GetByEmail, Create, Update
+  - IOTPRepository: GetById, GetByUserIdAndPurpose, Create, MarkUsed
+  - IRefreshTokenRepository: GetById, GetByToken, Create, Revoke
+  - IPasswordHasher: HashPassword(string), VerifyPassword(string, hash)
+  - IOTPHasher: HashOTP(string), VerifyOTP(string, hash)
+  - ITokenService: GenerateToken(User), GenerateRefreshToken()
+  - IEmailService: SendEmail(to, subject, body)
+  - IEventPublisher: Publish<T>(T event)
+
+3.2 Application Layer - Commands
+---------------------------------
+
+Command: RegisterUserCommand
+  Fields: Email, Password, FirstName, LastName
+  Handler: RegisterUserCommandHandler
+    Dependencies: IUserRepository, IPasswordHasher, IEmailService, IEventPublisher
+    Flow:
+      1. Check if email already exists (throw UserAlreadyExistsException)
+      2. Hash password using IPasswordHasher
+      3. Create User entity via factory
+      4. Generate 6-digit OTP code
+      5. Hash OTP and save to OTPCode table
+      6. Send verification email with OTP
+      7. Generate JWT tokens
+      8. Publish UserRegisteredEvent
+      9. Return AuthResponse with tokens
+  Validator: (none, handled by handler)
+
+Command: LoginUserCommand
+  Fields: Email, Password
+  Handler: LoginUserCommandHandler
+    Dependencies: IUserRepository, IPasswordHasher, ITokenService
+    Flow:
+      1. Get user by email
+      2. If not found or password doesn't match, throw InvalidCredentialsException
+      3. Verify password with BCrypt
+      4. Check if email is verified (if not, return error)
+      5. Generate JWT access token
+      6. Generate refresh token (hash it)
+      7. Save refresh token to database
+      8. Return AuthResponse with tokens
+
+Command: VerifyEmailCommand
+  Fields: Email, OTPCode
+  Handler: VerifyEmailCommandHandler
+    Dependencies: IOTPRepository, IUserRepository
+    Flow:
+      1. Get user by email
+      2. Get OTP record by UserId and Purpose=EmailVerification
+      3. Verify OTP: check IsExpired, IsUsed, hash match
+      4. If invalid, throw OTPVerificationFailedException
+      5. Call user.VerifyEmail()
+      6. Mark OTP as used
+      7. Return success
+
+Command: RefreshTokenCommand
+  Fields: RefreshToken
+  Handler: RefreshTokenCommandHandler
+    Flow:
+      1. Hash the refresh token
+      2. Find in database
+      3. Check IsActive (!IsRevoked && !IsExpired)
+      4. If invalid, throw InvalidTokenException
+      5. Revoke old refresh token
+      6. Generate new access token
+      7. Generate new refresh token
+      8. Save new refresh token
+      9. Return new token pair
+
+3.3 Application Layer - Queries
+--------------------------------
+
+Query: GetUserProfileQuery
+  Fields: UserId
+  Handler: GetUserProfileQueryHandler
+    Flow:
+      1. Get user by Id
+      2. Map to UserProfileResponse
+      3. Return response
+
+3.4 Infrastructure Layer
+--------------------------
+
+IdentityDbContext:
+  DbSet<User> Users
+  DbSet<OTPCode> OtpCodes
+  DbSet<RefreshToken> RefreshTokens
+  OnModelCreating:
+    - User: Email unique index, lowercase conversion
+    - OTPCode: Index on UserId + Purpose
+    - RefreshToken: Index on Token hash
+
+UserRepository:
+  - GetById(id): Find by primary key
+  - GetByEmail(email): Find by email (case-insensitive)
+  - Create(user): Add to DbSet, SaveChanges
+  - Update(user): Update entry, SaveChanges
+
+PasswordHasher (BCryptPasswordHasher):
+  - HashPassword(password): BCrypt.HashPassword(password, workFactor: 10)
+  - VerifyPassword(password, hash): BCrypt.Verify(password, hash)
+
+OTPHasher (BCryptOTPHasher):
+  - HashOTP(otp): BCrypt.HashPassword(otp, workFactor: 10)
+  - VerifyOTP(otp, hash): BCrypt.Verify(otp, hash)
+
+JwtTokenService:
+  - GenerateToken(user):
+    Claims: NameIdentifier (UserId), Name (Email), Role
+    Signing: SymmetricSecurityKey from config
+    Expiry: 1 hour
+  - GenerateRefreshToken():
+    32-byte random token, SHA-256 hash for storage
+
+GmailEmailService:
+  - SendEmail(to, subject, body):
+    Uses SMTP with app password
+    HTML format
+    From: FinVault noreply
+
+3.5 API Layer
+--------------
+
+AuthController:
+  POST /api/identity/auth/register
+    Input: RegisterUserCommand
+    Output: ApiResponse<AuthResponse>
+    Auth: None
+  
+  POST /api/identity/auth/login
+    Input: LoginUserCommand
+    Output: ApiResponse<AuthResponse>
+    Auth: None
+  
+  POST /api/identity/auth/verify-email
+    Input: VerifyEmailCommand
+    Output: ApiResponse
+    Auth: None
+  
+  POST /api/identity/auth/refresh
+    Input: RefreshTokenCommand
+    Output: ApiResponse<AuthResponse>
+    Auth: None
+  
+  POST /api/identity/auth/forgot-password
+    Input: SendOTPCommand (Purpose = PasswordReset)
+    Output: ApiResponse (always 200)
+    Auth: None
+  
+  POST /api/identity/auth/reset-password
+    Input: ResetPasswordCommand
+    Output: ApiResponse
+    Auth: None
+
+UsersController:
+  GET /api/identity/users/me
+    Input: None (UserId from JWT)
+    Output: ApiResponse<UserProfileResponse>
+    Auth: JWT Required
+
+================================================================================
+                          4. CARD SERVICE - DETAILED DESIGN
+================================================================================
+
+4.1 Domain Layer
+-----------------
+
+Entity: CreditCard
+  Properties:
+    - Guid Id, UserId, IssuerId
+    - string MaskedNumber, CardholderName
+    - byte ExpiryMonth, short ExpiryYear
+    - decimal CreditLimit, OutstandingBalance
+    - byte BillingCycleStartDay
+    - bool IsDefault, IsVerified, IsDeleted
+    - string EncryptedCardNumber, EncryptedCVV, CardNumberLastFour
+    - DateTimeOffset CreatedAt, UpdatedAt, DeletedAt
+  
+  Computed:
+    - decimal AvailableCredit => CreditLimit - OutstandingBalance
+    - decimal Utilization => (OutstandingBalance / CreditLimit) * 100
+    - bool IsExpired => Expiry date has passed
+  
+  Factory:
+    - static Create(userId, maskedNumber, cardholderName, expiryMonth,
+                    expiryYear, issuerId, creditLimit, billingCycleStartDay,
+                    encryptedCardNumber, encryptedCVV, cardNumberLastFour)
+  
+  Methods:
+    - void UpdateLimit(newLimit)
+    - void UpdateBalance(amount) => OutstandingBalance = Max(0, Current + amount)
+    - void SetAsDefault() => IsDefault = true
+    - void UnsetDefault() => IsDefault = false
+    - void Verify() => IsVerified = true
+    - void SoftDelete() => IsDeleted = true, DeletedAt = UtcNow
+
+Entity: CardIssuer
+  Properties:
+    - Guid Id, string Name
+    - byte CardLength, string BinPrefixes
+    - DateTimeOffset CreatedAt
+  
+  Factory:
+    - static Create(name, cardLength, binPrefixes)
+
+Domain Interfaces:
+  - ICreditCardRepository: GetAllByUserId, GetById, Create, Update, SoftDelete
+  - ICardIssuerRepository: GetById, GetAll
+  - ICardEncryptionService: Encrypt(data), Decrypt(data)
+  - IEventPublisher: Publish<T>(T event)
+
+4.2 Application Layer
+----------------------
+
+Command: AddCardCommand
+  Fields: CardNumber, CardholderName, ExpiryMonth, ExpiryYear, IssuerId,
+          CreditLimit, BillingCycleStartDay
+  Handler: AddCardCommandHandler
+    Dependencies: ICreditCardRepository, ICardEncryptionService, ICardIssuerRepository, IEventPublisher
+    Flow:
+      1. Validate card number using BIN prefixes from CardIssuer
+      2. Encrypt card number and CVV using ICardEncryptionService
+      3. Create masked number (XXXX-XXXX-XXXX-Last4)
+      4. Create CreditCard entity
+      5. If first card, set as default
+      6. Save to database
+      7. Publish CardAddedEvent
+      8. Return CardResponse
+
+Command: RemoveCardCommand
+  Fields: CardId
+  Handler: Calls SoftDelete() on entity
+
+Command: SetDefaultCardCommand
+  Fields: UserId, CardId
+  Handler:
+    1. Get all user's cards
+    2. UnsetDefault() on all
+    3. SetAsDefault() on target card
+    4. Save changes
+
+Command: VerifyCardCommand
+  Fields: CardId
+  Handler:
+    1. Process Rs.1 verification charge (external payment gateway)
+    2. On success, call card.Verify()
+    3. Return success
+
+Command: UpdateCardLimitCommand
+  Fields: CardId, NewLimit
+  Handler: Calls card.UpdateLimit(newLimit)
+
+Query: GetCardsQuery
+  Fields: UserId
+  Handler: GetAllByUserId, map to CardSummaryResponse list
+
+Query: GetCardByIdQuery
+  Fields: CardId
+  Handler: GetById, map to CardResponse
+
+Query: GetCardUtilizationQuery
+  Fields: UserId
+  Handler:
+    1. Get all user's cards
+    2. Sum CreditLimit, Sum OutstandingBalance
+    3. Calculate AvailableCredit, OverallUtilization
+    4. Return utilization summary
+
+Query: RevealCardQuery
+  Fields: CardId, UserId
+  Handler:
+    1. Get card, verify ownership (UserId match)
+    2. Decrypt card number and CVV
+    3. Return RevealCardResponse with decrypted data
+
+4.3 Infrastructure Layer
+--------------------------
+
+AesCardEncryptionService:
+  - Encrypt(plainText):
+    Algorithm: AES-256-CBC
+    Key: From configuration (32 bytes)
+    IV: Random 16 bytes, prepended to ciphertext
+    Returns: Base64(IV + Ciphertext)
+  - Decrypt(encryptedData):
+    Extract IV from first 16 bytes
+    Decrypt remaining bytes
+    Return plaintext
+
+CardDbContext:
+  DbSet<CreditCard> CreditCards
+  DbSet<CardIssuer> CardIssuers
+  Configurations:
+    - CreditCard: Index on UserId, Encrypted fields not indexed
+    - CardIssuer: Unique index on Name
+
+================================================================================
+                          5. PAYMENT SERVICE - DETAILED DESIGN
+================================================================================
+
+5.1 Domain Layer
+-----------------
+
+Entity: Payment
+  Properties:
+    - Guid Id, UserId, CardId, BillId
+    - decimal Amount
+    - string PaymentType (Full, Minimum, Custom)
+    - string Status (Initiated, Completed, Failed, Reversed)
+    - string? FailureReason
+    - string? OtpHash, DateTimeOffset? OtpExpiresAt
+    - bool IsDeleted
+    - DateTimeOffset CreatedAt, UpdatedAt, DeletedAt
+  
+  Computed:
+    - bool IsCompleted => Status == "Completed"
+    - bool IsFailed => Status == "Failed"
+    - bool IsOtpExpired => OtpExpiresAt.HasValue && UtcNow >= ExpiresAt
+  
+  Factory:
+    - static Create(userId, cardId, billId, amount, paymentType)
+      Status = "Initiated"
+  
+  Methods:
+    - void SetOtp(otpHash) => OtpHash = hash, OtpExpiresAt = UtcNow + 5min
+    - void ClearOtp() => OtpHash = null, OtpExpiresAt = null
+    - void Complete() => Status = "Completed", ClearOtp()
+    - void Fail(reason) => Status = "Failed", FailureReason = reason, ClearOtp()
+    - void Reverse() => Status = "Reversed"
+    - void SoftDelete() => IsDeleted = true
+
+Entity: Transaction
+  Properties:
+    - Guid Id, PaymentId, UserId, CardId
+    - decimal Amount
+    - string Type (Payment, Reversal)
+    - string Category
+    - string? Description
+    - DateTimeOffset CreatedAt
+  
+  Factories:
+    - static CreatePayment(paymentId, userId, cardId, amount, category, description)
+    - static CreateReversal(paymentId, userId, cardId, amount, category, description)
+
+Entity: PaymentSaga
+  Properties:
+    - Guid Id, PaymentId
+    - string CurrentState (Initiated, RiskCheckPassed, Processing, Completed, Failed)
+    - decimal? RiskScore
+    - int? RewardPointsGranted
+    - string? CompensationReason
+    - DateTimeOffset CreatedAt, UpdatedAt
+  
+  Factory:
+    - static Create(paymentId) => CurrentState = "Initiated"
+  
+  Methods:
+    - void PassRiskCheck(score) => State = "RiskCheckPassed"
+    - void StartProcessing() => State = "Processing"
+    - void Complete(rewardPoints) => State = "Completed", RewardPointsGranted = points
+    - void Fail(reason) => State = "Failed", CompensationReason = reason
+
+Entity: RiskScore
+  Properties:
+    - Guid Id, UserId, PaymentId?
+    - decimal Score (0-100)
+    - string Decision (AutoApproved, OTPRequired, Blocked)
+    - DateTimeOffset CreatedAt
+  
+  Factory:
+    - static Create(userId, paymentId, score):
+      Decision = score < 30 ? AutoApproved : score <= 70 ? OTPRequired : Blocked
+
+Entity: FraudAlert
+  Properties:
+    - Guid Id, UserId, PaymentId?
+    - string AlertType
+    - decimal RiskScore
+    - string Status (Open, Resolved, FalsePositive)
+    - DateTimeOffset CreatedAt, UpdatedAt
+  
+  Methods:
+    - void Resolve() => Status = "Resolved"
+    - void MarkFalsePositive() => Status = "FalsePositive"
+
+Entity: ExternalBillPayment
+  Similar to Payment but for external bills:
+    - BillerName, BillerCategory, BillNumber
+    - OTP expiry: 15 minutes (longer than regular payments)
+
+5.2 Application Layer - Key Handlers
+--------------------------------------
+
+InitiatePaymentCommandHandler:
+  Dependencies: IPaymentRepository, IPaymentSagaRepository, IRiskScoreRepository,
+                IOTPHasher, IEmailService, IEventPublisher
+  Flow:
+    1. Create Payment entity (Initiated)
+    2. Create PaymentSaga (Initiated)
+    3. Generate OTP, hash it, set on payment
+    4. Send OTP via email
+    5. Evaluate risk score
+    6. If risk > 70: Fail payment, create FraudAlert
+    7. If risk 30-70: Require OTP (already sent)
+    8. If risk < 30: Can auto-approve (still need OTP for security)
+    9. Save all entities
+    10. Publish PaymentInitiatedEvent
+    11. Return success
+
+CompletePaymentCommandHandler:
+  Flow:
+    1. Get payment by Id
+    2. Verify OTP (check hash match, not expired)
+    3. payment.Complete()
+    4. Update PaymentSaga state to Completed
+    5. Create Transaction record
+    6. Publish PaymentCompletedEvent
+    7. Return success
+
+EvaluateRiskCommandHandler:
+  Flow:
+    1. Analyze payment patterns (velocity, amount, location if available)
+    2. Calculate risk score (algorithm-based)
+    3. Create RiskScore entity
+    4. If score > 70: Create FraudAlert
+    5. Return risk score with decision
+
+5.3 Payment Saga Orchestration
+-------------------------------
+
+State Transitions:
+  Initiated → RiskCheckPassed (after risk evaluation)
+  RiskCheckPassed → Processing (when OTP verified)
+  Processing → Completed (on payment success)
+  Processing → Failed (on payment failure)
+  
+Compensation:
+  If saga fails at any point, record reason
+  Future: Auto-compensate (reverse partial charges)
+
+================================================================================
+                          6. BILLING SERVICE - DETAILED DESIGN
+================================================================================
+
+6.1 Domain Layer
+-----------------
+
+Entity: Bill
+  Properties:
+    - Guid Id, UserId, CardId
+    - decimal TotalAmount, MinimumDue, AmountPaid
+    - DateTimeOffset DueDate
+    - string BillingMonth
+    - string Status (Pending, PartiallyPaid, Paid, Overdue)
+    - bool IsDeleted
+    - DateTimeOffset CreatedAt, UpdatedAt, DeletedAt
+  
+  Computed:
+    - decimal RemainingBalance => TotalAmount - AmountPaid
+  
+  Factory:
+    - static Create(userId, cardId, totalAmount, minimumDue, dueDate, billingMonth)
+      Validates: amounts > 0, minimumDue <= totalAmount, dueDate in future
+  
+  Methods:
+    - void RecordPayment(amount) => AmountPaid += amount
+      Status = AmountPaid >= TotalAmount ? Paid : PartiallyPaid
+    - void MarkOverdue() => Status = Overdue (if not Paid)
+    - void MarkPaid() => Status = Paid
+    - void SoftDelete() => IsDeleted = true
+
+Entity: PaymentSchedule
+  Properties:
+    - Guid Id, BillId, UserId
+    - decimal Amount
+    - DateTimeOffset ScheduledDate
+    - string Status (Pending, Executed, Cancelled)
+    - Bill Bill (navigation)
+  
+  Factory:
+    - static Create(billId, userId, amount, scheduledDate)
+      Validates: scheduledDate > UtcNow
+  
+  Methods:
+    - void Execute() => Status = Executed (only if Pending)
+    - void Cancel() => Status = Cancelled (only if Pending)
+
+Entity: RewardAccount
+  Properties:
+    - Guid Id, UserId
+    - int Balance
+    - int LifetimePoints
+    - RewardTier Tier
+    - DateTimeOffset CreatedAt, UpdatedAt
+  
+  Methods:
+    - void AddPoints(points) => Balance += points, LifetimePoints += points
+    - void RedeemPoints(points) => Balance -= points (if Balance >= points)
+    - void UpgradeTier(newTier) => Check threshold, update tier
+
+Entity: RewardTier
+  Properties:
+    - Guid Id, string Name
+    - int MinPoints, int MaxPoints
+    - decimal Multiplier
+
+Entity: RewardTransaction
+  Properties:
+    - Guid Id, RewardAccountId
+    - string Type (Earned, Redeemed)
+    - int Points
+    - string? Description
+    - DateTimeOffset CreatedAt
+  
+  Factories:
+    - static CreateEarned(rewardAccountId, points, description)
+    - static CreateRedeemed(rewardAccountId, points, description)
+
+6.2 Application Layer
+----------------------
+
+GenerateBillCommandHandler:
+  Flow:
+    1. Check if bill already exists for user+card+month (throw if exists)
+    2. Create Bill entity
+    3. Save to database
+    4. Publish BillGeneratedEvent
+    5. Return BillResponse
+
+SchedulePaymentCommandHandler:
+  Flow:
+    1. Create PaymentSchedule entity
+    2. Validate scheduledDate > UtcNow
+    3. Save to database
+    4. Return SchedulePaymentResponse
+
+CancelScheduleCommandHandler:
+  Flow:
+    1. Get schedule by Id
+    2. If not Pending, throw exception
+    3. schedule.Cancel()
+    4. Save changes
+
+================================================================================
+                          7. NOTIFICATION SERVICE - DETAILED DESIGN
+================================================================================
+
+7.1 Domain Layer
+-----------------
+
+Entity: Notification
+  Properties:
+    - Guid Id, UserId
+    - string Type (Payment, Security, Billing, Reward, Card, System)
+    - string Title, Message
+    - string Channel (Email, SMS, Push, InApp)
+    - string Priority (Low, Normal, High, Critical)
+    - bool IsRead, DateTimeOffset? ReadAt
+    - string? ReferenceId, CorrelationId
+    - DateTimeOffset CreatedAt
+  
+  Factory:
+    - static Create(userId, type, title, message, channel, priority, referenceId, correlationId)
+      Validates: all required fields
+  
+  Methods:
+    - void MarkAsRead() => IsRead = true, ReadAt = UtcNow
+
+Entity: NotificationPreference
+  Properties:
+    - Guid Id, UserId
+    - string Channel
+    - bool IsEnabled
+    - DateTimeOffset CreatedAt, UpdatedAt
+  
+  Methods:
+    - void SetEnabled(enabled) => IsEnabled = enabled
+
+7.2 Event Consumers
+--------------------
+
+PaymentCompletedConsumer:
+  On PaymentCompletedEvent:
+    1. Create Notification (Type: Payment, Priority: Normal)
+    2. Message: "Your payment of {Amount} was completed"
+    3. Save to database
+
+FraudDetectedConsumer:
+  On FraudDetectedEvent:
+    1. Create Notification (Type: Security, Priority: Critical)
+    2. Message: "Suspicious activity detected on your account"
+    3. Save to database
+
+BillDueReminderConsumer:
+  On BillDueReminderEvent:
+    1. Create Notification (Type: Billing, Priority: High)
+    2. Message: "Your bill of {Amount} is due on {Date}"
+    3. Save to database
+
+CardExpirySoonConsumer:
+  On CardExpirySoonEvent:
+    1. Create Notification (Type: Card, Priority: High)
+    2. Message: "Your card ending in {Last4} expires on {Date}"
+    3. Save to database
+
+================================================================================
+                          8. API GATEWAY - DETAILED DESIGN
+================================================================================
+
+8.1 Ocelot Configuration
+--------------------------
+
+File: ocelot.json
+
+Global Configuration:
+  RateLimitOptions:
+    EnableRateLimiting: true
+    Period: "1s"
+    Limit: 100
+  
+  QoSOptions:
+    TimeoutValue: 30000 (30 seconds)
+    ExceptionsAllowedBeforeBreaking: 3
+
+Route Definitions:
+
+  Route 1: Identity Service
+    DownstreamPathTemplate: /api/identity/{everything}
+    DownstreamScheme: http
+    DownstreamHostAndPorts: { Host: "identity-service", Port: 80 }
+    UpstreamPathTemplate: /api/identity/{everything}
+    UpstreamHttpMethod: [ "GET", "POST", "PUT", "DELETE" ]
+
+  Route 2: Payment Service
+    DownstreamPathTemplate: /api/{everything}
+    DownstreamHostAndPorts: { Host: "payment-service", Port: 80 }
+    UpstreamPathTemplate: /api/payments/{everything}
+
+  (Similar routes for other services)
+
+================================================================================
+                          9. DATABASE SCHEMA DESIGN
+================================================================================
+
+9.1 Identity Database
+----------------------
+
+Table: Users
+  Column          | Type             | Constraints
+  ----------------|------------------|---------------------------
+  Id              | UNIQUEIDENTIFIER | PK, NOT NULL
+  Email           | NVARCHAR(255)    | UNIQUE, NOT NULL
+  PasswordHash    | NVARCHAR(255)    | NOT NULL
+  FirstName       | NVARCHAR(100)    | NOT NULL
+  LastName        | NVARCHAR(100)    | NOT NULL
+  Role            | NVARCHAR(50)     | DEFAULT 'User'
+  IsEmailVerified | BIT              | DEFAULT 0
+  IsActive        | BIT              | DEFAULT 1
+  CreatedAt       | DATETIMEOFFSET   | DEFAULT SYSUTCDATETIME()
+  UpdatedAt       | DATETIMEOFFSET   | NULL
+  
+  Indexes: IX_Users_Email (UNIQUE)
+
+Table: OtpCodes
+  Column      | Type             | Constraints
+  ------------|------------------|---------------------------
+  Id          | UNIQUEIDENTIFIER | PK
+  UserId      | UNIQUEIDENTIFIER | FK -> Users.Id
+  CodeHash    | NVARCHAR(255)    | NOT NULL
+  Purpose     | NVARCHAR(50)     | NOT NULL
+  ExpiresAt   | DATETIMEOFFSET   | NOT NULL
+  IsUsed      | BIT              | DEFAULT 0
+  CreatedAt   | DATETIMEOFFSET   | DEFAULT SYSUTCDATETIME()
+  
+  Indexes: IX_OtpCodes_UserId_Purpose
+
+Table: RefreshTokens
+  Column      | Type             | Constraints
+  ------------|------------------|---------------------------
+  Id          | UNIQUEIDENTIFIER | PK
+  UserId      | UNIQUEIDENTIFIER | FK -> Users.Id
+  Token       | NVARCHAR(255)    | NOT NULL
+  ExpiresAt   | DATETIMEOFFSET   | NOT NULL
+  IsRevoked   | BIT              | DEFAULT 0
+  CreatedAt   | DATETIMEOFFSET   | DEFAULT SYSUTCDATETIME()
+  
+  Indexes: IX_RefreshTokens_Token
+
+9.2 Card Database
+------------------
+
+Table: CreditCards
+  Column               | Type               | Constraints
+  ---------------------|--------------------|---------------------------
+  Id                   | UNIQUEIDENTIFIER   | PK
+  UserId               | UNIQUEIDENTIFIER   | NOT NULL, Indexed
+  MaskedNumber         | NVARCHAR(19)       | NOT NULL
+  CardholderName       | NVARCHAR(100)      | NOT NULL
+  ExpiryMonth          | TINYINT            | NOT NULL
+  ExpiryYear           | SMALLINT           | NOT NULL
+  IssuerId             | UNIQUEIDENTIFIER   | FK -> CardIssuers.Id
+  CreditLimit          | DECIMAL(18,2)      | NOT NULL
+  OutstandingBalance   | DECIMAL(18,2)      | DEFAULT 0
+  BillingCycleStartDay | TINYINT            | NOT NULL
+  IsDefault            | BIT                | DEFAULT 0
+  IsVerified           | BIT                | DEFAULT 0
+  IsDeleted            | BIT                | DEFAULT 0
+  EncryptedCardNumber  | NVARCHAR(MAX)      | NOT NULL
+  EncryptedCVV         | NVARCHAR(MAX)      | NOT NULL
+  CardNumberLastFour   | NVARCHAR(4)        | NOT NULL
+  CreatedAt            | DATETIMEOFFSET     | DEFAULT SYSUTCDATETIME()
+  UpdatedAt            | DATETIMEOFFSET     | NULL
+  DeletedAt            | DATETIMEOFFSET     | NULL
+  
+  Indexes: IX_CreditCards_UserId
+
+9.3 Payment Database
+---------------------
+
+Table: Payments
+  Column         | Type               | Constraints
+  ---------------|--------------------|---------------------------
+  Id             | UNIQUEIDENTIFIER   | PK
+  UserId         | UNIQUEIDENTIFIER   | NOT NULL, Indexed
+  CardId         | UNIQUEIDENTIFIER   | NOT NULL
+  BillId         | UNIQUEIDENTIFIER   | NOT NULL
+  Amount         | DECIMAL(18,2)      | NOT NULL
+  PaymentType    | NVARCHAR(50)       | NOT NULL
+  Status         | NVARCHAR(50)       | NOT NULL
+  FailureReason  | NVARCHAR(MAX)      | NULL
+  OtpHash        | NVARCHAR(255)      | NULL
+  OtpExpiresAt   | DATETIMEOFFSET     | NULL
+  IsDeleted      | BIT                | DEFAULT 0
+  CreatedAt      | DATETIMEOFFSET     | DEFAULT SYSUTCDATETIME()
+  UpdatedAt      | DATETIMEOFFSET     | NULL
+  DeletedAt      | DATETIMEOFFSET     | NULL
+  
+  Indexes: IX_Payments_UserId, IX_Payments_Status
+
+Table: Transactions
+  Column       | Type               | Constraints
+  -------------|--------------------|---------------------------
+  Id           | UNIQUEIDENTIFIER   | PK
+  PaymentId    | UNIQUEIDENTIFIER   | NOT NULL, Indexed
+  UserId       | UNIQUEIDENTIFIER   | NOT NULL, Indexed
+  CardId       | UNIQUEIDENTIFIER   | NOT NULL
+  Amount       | DECIMAL(18,2)      | NOT NULL
+  Type         | NVARCHAR(50)       | NOT NULL
+  Category     | NVARCHAR(100)      | NOT NULL
+  Description  | NVARCHAR(MAX)      | NULL
+  CreatedAt    | DATETIMEOFFSET     | DEFAULT SYSUTCDATETIME()
+  
+  Indexes: IX_Transactions_UserId, IX_Transactions_CardId
+
+9.4 Billing Database
+---------------------
+
+Table: Bills
+  Column         | Type               | Constraints
+  ---------------|--------------------|---------------------------
+  Id             | UNIQUEIDENTIFIER   | PK
+  UserId         | UNIQUEIDENTIFIER   | NOT NULL, Indexed
+  CardId         | UNIQUEIDENTIFIER   | NOT NULL
+  TotalAmount    | DECIMAL(18,2)      | NOT NULL
+  MinimumDue     | DECIMAL(18,2)      | NOT NULL
+  AmountPaid     | DECIMAL(18,2)      | DEFAULT 0
+  DueDate        | DATETIMEOFFSET     | NOT NULL
+  BillingMonth   | NVARCHAR(50)       | NOT NULL
+  Status         | NVARCHAR(50)       | DEFAULT 'Pending'
+  IsDeleted      | BIT                | DEFAULT 0
+  CreatedAt      | DATETIMEOFFSET     | DEFAULT SYSUTCDATETIME()
+  UpdatedAt      | DATETIMEOFFSET     | NULL
+  DeletedAt      | DATETIMEOFFSET     | NULL
+  
+  Indexes: IX_Bills_UserId, IX_Bills_Status
+
+================================================================================
+                          10. API CONTRACTS
+================================================================================
+
+10.1 Shared DTOs
+-----------------
+
+ApiResponse<T>:
+  Properties:
+    - bool Success
+    - string Message
+    - T? Data
+    - List<string>? Errors
+  
+  Factory Methods:
+    - static ApiResponse<T> Ok(T data, string message)
+    - static ApiResponse<T> Fail(string message, List<string>? errors)
+
+AuthResponse:
+  Properties:
+    - Guid UserId
+    - string Email
+    - string Token (JWT access token)
+    - string RefreshToken
+
+UserProfileResponse:
+  Properties:
+    - Guid UserId
+    - string Email
+    - string FirstName, LastName
+    - string FullName (computed)
+    - string Role
+    - bool IsEmailVerified
+    - bool IsActive
+    - DateTimeOffset CreatedAt
+
+CardResponse:
+  Properties:
+    - Guid CardId
+    - string MaskedNumber
+    - string CardholderName
+    - byte ExpiryMonth, short ExpiryYear
+    - decimal CreditLimit, OutstandingBalance, AvailableCredit
+    - decimal Utilization
+    - bool IsDefault, IsVerified, IsExpired
+    - string IssuerName
+
+PaymentResponse:
+  Properties:
+    - Guid PaymentId
+    - decimal Amount
+    - string Status
+    - string PaymentType
+    - DateTimeOffset CreatedAt
+
+BillResponse:
+  Properties:
+    - Guid BillId
+    - decimal TotalAmount, MinimumDue, AmountPaid, RemainingBalance
+    - string Status
+    - DateTimeOffset DueDate
+    - string BillingMonth
+
+10.2 Event Contracts
+---------------------
+
+UserRegisteredEvent:
+  - Guid UserId
+  - string Email
+  - string Name
+  - DateTimeOffset RegisteredAt
+
+PaymentCompletedEvent:
+  - Guid PaymentId
+  - Guid UserId
+  - Guid BillId
+  - decimal Amount
+  - DateTimeOffset CompletedAt
+
+BillGeneratedEvent:
+  - Guid BillId
+  - Guid UserId
+  - Guid CardId
+  - decimal TotalAmount
+  - string BillingMonth
+
+================================================================================
+                          11. CLASS DIAGRAMS
+================================================================================
+
+11.1 Identity Service Classes
+-------------------------------
+
+  +------------------+       +------------------+       +------------------+
+  |     User         |       |    OTPCode       |       |  RefreshToken    |
+  +------------------+       +------------------+       +------------------+
+  | -Id: Guid        |       | -Id: Guid        |       | -Id: Guid        |
+  | -Email: string   |       | -UserId: Guid    |       | -UserId: Guid    |
+  | -PasswordHash    |       | -CodeHash        |       | -Token: string   |
+  | -FirstName       |       | -Purpose         |       | -ExpiresAt       |
+  | -LastName        |       | -ExpiresAt       |       | -IsRevoked       |
+  | -Role            |       | -IsUsed          |       | -User: User      |
+  | -IsEmailVerified |       |                  |       +------------------+
+  | -IsActive        |       +------------------+              |
+  +------------------+              |                          |
+         |                          |                          |
+  +------------------+       +------------------+       +------------------+
+  | IUserRepository  |       | IOTPRepository   |       |ITokenService     |
+  +------------------+       +------------------+       +------------------+
+  | GetById          |       | GetById          |       | GenerateToken    |
+  | GetByEmail       |       | GetByUserId      |       | GenerateRefresh  |
+  | Create           |       | Create           |       +------------------+
+  | Update           |       | MarkUsed         |
+  +------------------+       +------------------+
+
+11.2 MediatR Pattern Classes
+------------------------------
+
+  +------------------+       +------------------+       +------------------+
+  | RegisterUserCmd  |       |  RegisterHandler |       | IUserRepository  |
+  +------------------+       +------------------+       +------------------+
+  | Email: string    |------>| Handle()         |----->| Create           |
+  | Password         |       |   -CheckExists   |       +------------------+
+  | FirstName        |       |   -HashPassword  |              |
+  | LastName         |       |   -CreateUser    |       +------------------+
+  +------------------+       |   -SendOTP       |------>| IEmailService    |
+                             |   -GenerateJWT   |       +------------------+
+                             |   -PublishEvent  |       +------------------+
+                             +------------------+------>| IEventPublisher  |
+                                                        +------------------+
+
+================================================================================
+                          12. SEQUENCE DIAGRAMS
+================================================================================
+
+12.1 User Registration Flow
+-----------------------------
+
+  Client          Gateway        Identity Service       Database        Email Service
+    |                |                  |                   |                  |
+    |--POST /register->|                  |                   |                  |
+    |                |--forward request-->|                   |                  |
+    |                |                  |--Check email exists->|                  |
+    |                |                  |<--User not found-----|                  |
+    |                |                  |--Hash password------|                  |
+    |                |                  |--Create User-------->|                  |
+    |                |                  |--Save User----------+                  |
+    |                |                  |--Generate OTP       |                  |
+    |                |                  |--Save OTP---------->|                  |
+    |                |                  |--Publish Event------|--------RabbitMQ->|
+    |                |                  |--Generate JWT       |                  |
+    |                |                  |--Return response----+                  |
+    |                |<--response---------|                   |                  |
+    |<--200 OK---------|                  |                   |--Send Email------>|
+
+12.2 Payment Processing Flow
+------------------------------
+
+  Client       Gateway    Payment Service    Database     Risk Engine   Email Service   RabbitMQ
+    |             |              |               |              |              |             |
+    |--POST /pay->|              |               |              |              |             |
+    |             |--forward---->|               |              |              |             |
+    |             |              |--Create Payment->|            |              |             |
+    |             |              |--Create Saga---->|            |              |             |
+    |             |              |--Generate OTP-->|              |              |             |
+    |             |              |--Eval Risk--------------------->|              |             |
+    |             |              |<--Risk Score-------------------|              |             |
+    |             |              |--Save RiskScore>|              |              |             |
+    |             |              |--Send OTP--------------------->|             |
+    |             |              |--Publish Event-------------------------------->|
+    |             |              |--Return response|              |              |             |
+    |<--200 OK-----|<--response---|               |              |              |             |
+    |             |              |               |              |              |             |
+    |--POST OTP-->|              |               |              |              |             |
+    |             |--forward---->|               |              |              |             |
+    |             |              |--Verify OTP--->|              |              |             |
+    |             |              |--Complete Pay->|              |              |             |
+    |             |              |--Update Saga-->|              |              |             |
+    |             |              |--Create Trans->|              |              |             |
+    |             |              |--Publish Event------------------------------>|
+    |<--Success----|<--response---|               |              |              |             |
+
+================================================================================
+                          13. STATE MACHINES
+================================================================================
+
+13.1 Payment State Machine
+----------------------------
+
+  States: Initiated → Completed
+          Initiated → Failed
+          Initiated → Reversed (via Complete → Reversed)
+
+  Transitions:
+    Initiated + OTP Verified → Complete() → Completed
+    Initiated + OTP Invalid → Fail(reason) → Failed
+    Initiated + Risk High → Fail("High risk") → Failed
+    Completed + Reversal Request → Reverse() → Reversed
+
+  Guards:
+    - CanComplete: IsOtpValid && !IsCompleted
+    - CanFail: !IsCompleted
+    - CanReverse: IsCompleted && !IsReversed
+
+13.2 Bill State Machine
+-------------------------
+
+  States: Pending → Paid
+          Pending → PartiallyPaid → Paid
+          Pending → Overdue
+
+  Transitions:
+    Pending + Payment < Total → RecordPayment() → PartiallyPaid
+    Pending/PartiallyPaid + Payment >= Total → MarkPaid() → Paid
+    Pending + DueDate Passed → MarkOverdue() → Overdue
+
+  Guards:
+    - CanRecordPayment: Status in {Pending, PartiallyPaid}
+    - CanMarkOverdue: Status == Pending && DueDate < UtcNow
+
+13.3 Payment Saga State Machine
+---------------------------------
+
+  States: Initiated → RiskCheckPassed → Processing → Completed
+          Initiated → RiskCheckPassed → Processing → Failed
+
+  Transitions:
+    Initiated + Risk Evaluated → PassRiskCheck(score) → RiskCheckPassed
+    RiskCheckPassed + OTP Verified → StartProcessing() → Processing
+    Processing + Payment Success → Complete(points) → Completed
+    Processing + Payment Failure → Fail(reason) → Failed
+
+================================================================================
+                          14. ERROR HANDLING IMPLEMENTATION
+================================================================================
+
+14.1 Exception Middleware
+--------------------------
+
+Each service implements ExceptionMiddleware:
+
+  try {
+    await next(context);
+  }
+  catch (ValidationException ex) {
+    // 400 Bad Request with validation errors
+    context.Response.StatusCode = 400;
+    return ApiResponse.Fail("Validation failed", ex.Errors);
+  }
+  catch (EntityNotFoundException ex) {
+    // 404 Not Found
+    context.Response.StatusCode = 404;
+    return ApiResponse.Fail(ex.Message);
+  }
+  catch (UnauthorizedAccessException ex) {
+    // 401 Unauthorized
+    context.Response.StatusCode = 401;
+    return ApiResponse.Fail("Not authorized");
+  }
+  catch (Exception ex) {
+    // 500 Internal Server Error
+    logger.LogError(ex, "Unhandled exception");
+    context.Response.StatusCode = 500;
+    return ApiResponse.Fail("Internal error");
+  }
+
+14.2 Custom Exceptions
+-----------------------
+
+All custom exceptions inherit from FinVaultException:
+  - BillAlreadyExistsException
+  - BillNotFoundException
+  - CardAlreadyVerifiedException
+  - CardDecryptionFailedException
+  - CardNotFoundException
+  - EntityNotFoundException
+  - InsufficientFundsException
+  - InvalidBillStatusException
+  - InvalidCredentialsException
+  - InvalidTokenException
+  - NotificationNotFoundException
+  - OTPVerificationFailedException
+  - PaymentAlreadyCompletedException
+  - PaymentNotFoundException
+  - PaymentSagaNotFoundException
+  - TransactionFailedException
+  - UserAlreadyExistsException
+
+14.3 Validation Pipeline
+--------------------------
+
+MediatR Pipeline Behavior (ValidationPipelineBehaviour):
+  - Intercepts all commands before handler execution
+  - Runs FluentValidation validators
+  - If validation fails, throws ValidationException
+  - Handler never executes if validation fails
+
+  Implementation:
+    public async Task<TResponse> Handle(TRequest request, 
+        RequestHandlerDelegate<TResponse> next, CancellationToken ct)
+    {
+        var validators = _validators.Where(v => v.GetType()
+            .GetInterfaces().Any(i => i.IsGenericType && 
+            i.GetGenericArguments()[0] == typeof(TRequest)));
+        
+        var context = new ValidationContext<TRequest>(request);
+        var results = await Task.WhenAll(
+            validators.Select(v => v.ValidateAsync(context, ct)));
+        
+        var failures = results.SelectMany(r => r.Errors)
+            .Where(f => f != null).ToList();
+        
+        if (failures.Count != 0)
+            throw new ValidationException(failures);
+        
+        return await next();
+    }
+
+================================================================================
+                          15. TESTING STRATEGY
+================================================================================
+
+15.1 Unit Testing
+------------------
+
+Framework: xUnit
+Mocking: Moq
+
+What to Test:
+  - Domain entity factory methods (validation, property setting)
+  - Domain entity business methods (state changes, computed properties)
+  - Command handlers (with mocked dependencies)
+  - Query handlers (with mocked repositories)
+  - Validators (valid and invalid inputs)
+
+Example Test Structure:
+  public class PaymentTests
+  {
+      [Fact]
+      public void Create_WithValidData_ReturnsPayment()
+      {
+          // Arrange
+          var userId = Guid.NewGuid();
+          var cardId = Guid.NewGuid();
+          var billId = Guid.NewGuid();
+          var amount = 1000m;
+          
+          // Act
+          var payment = Payment.Create(userId, cardId, billId, amount, "Full");
+          
+          // Assert
+          payment.Should().NotBeNull();
+          payment.Status.Should().Be("Initiated");
+          payment.Amount.Should().Be(amount);
+      }
+      
+      [Fact]
+      public void Complete_WhenCalled_SetsStatusToCompleted()
+      {
+          // Arrange
+          var payment = CreateTestPayment();
+          
+          // Act
+          payment.Complete();
+          
+          // Assert
+          payment.IsCompleted.Should().BeTrue();
+          payment.IsOtpExpired.Should().BeFalse();
+          payment.OtpHash.Should().BeNull();
+      }
+  }
+
+15.2 Integration Testing
+--------------------------
+
+What to Test:
+  - API endpoints with in-memory database
+  - Repository implementations with test database
+  - Full request pipeline (Controller → Handler → Repository → DB)
+
+Approach:
+  - Use WebApplicationFactory for API testing
+  - Use Testcontainers for database integration tests
+  - Use WireMock for external service mocking
+
+15.3 Test Coverage Goals
+--------------------------
+
+  - Domain Layer: 90%+ (pure business logic, easy to test)
+  - Application Layer: 80%+ (handlers with mocked dependencies)
+  - Infrastructure Layer: 70%+ (repository integration tests)
+  - API Layer: 60%+ (endpoint integration tests)
+  - Overall: 75%+ minimum
+
+================================================================================
+                          APPENDIX A: NAMING CONVENTIONS
+================================================================================
+
+  - Entities: PascalCase (User, CreditCard, Payment)
+  - Commands: {Verb}{Noun}Command (RegisterUserCommand)
+  - Queries: Get{Noun}Query (GetUserProfileQuery)
+  - Handlers: {Command/Query}Handler (RegisterUserCommandHandler)
+  - Validators: {Command}Validator (RegisterUserValidator)
+  - Repositories: I{Entity}Repository, {Entity}Repository
+  - Services: I{ServiceName}, {ServiceName}Implementation
+  - Events: {Noun}{Verb}Event (UserRegisteredEvent)
+  - DTOs: {Noun}Response, {Noun}Request
+
+================================================================================
+                          APPENDIX B: CODING STANDARDS
+================================================================================
+
+  1. Use primary constructors where possible (C# 12+)
+  2. Prefer expression-bodied members for simple methods
+  3. Use file-scoped namespaces
+  4. Private setters on entity properties (encapsulation)
+  5. Factory methods for entity creation
+  6. Async/await for all I/O operations
+  7. CancellationToken support on all async methods
+  8. No business logic in controllers (delegate to handlers)
+  9. No EF Core calls in handlers (use repositories)
+  10. Always validate input (FluentValidation)
+
+================================================================================
+                          DOCUMENT HISTORY
+================================================================================
+
+  Version | Date          | Author          | Description
+  --------|---------------|-----------------|---------------------------
+  1.0     | April 11, 2026| Development Team| Initial LLD document
+
+================================================================================
+                          END OF LLD DOCUMENT
+================================================================================

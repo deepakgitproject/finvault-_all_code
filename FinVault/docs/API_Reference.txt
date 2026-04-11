@@ -1,0 +1,1439 @@
+================================================================================
+                        FinVault API Reference Documentation
+                        Credit Card Management System
+================================================================================
+
+Version: 1.0
+Last Updated: April 11, 2026
+Base URL: http://localhost:[port]
+
+Services:
+  - Identity Service: User authentication and profile management
+  - Payment Service: Payment processing and fraud detection
+  - Billing Service: Bill generation and payment scheduling
+  - Card Service: Credit card management
+  - Notification Service: Real-time alerts and notifications
+
+Authentication:
+  All endpoints except /api/identity/auth/* require JWT authentication.
+  Include JWT token in Authorization header:
+    Authorization: Bearer <token>
+
+Response Format:
+  All endpoints return JSON in the following format:
+  {
+    "success": true/false,
+    "message": "Description message",
+    "data": { ... },
+    "errors": [ "error1", "error2" ]
+  }
+
+================================================================================
+                          IDENTITY SERVICE
+================================================================================
+
+Service: Identity Service
+Base Path: /api/identity
+Description: Handles user registration, authentication, email verification,
+             password management, and user profiles.
+Database: SQL Server - Identity database
+Auth: JWT Bearer tokens with refresh capability
+
+--------------------------------------------------------------------------------
+1. AUTHENTICATION ENDPOINTS (No Authentication Required)
+--------------------------------------------------------------------------------
+
+Endpoint 1.1: User Registration
+  Method: POST
+  Route: /api/identity/auth/register
+  Auth: None (Public)
+  Description: Register a new user account with email and password
+  
+  Request Body:
+  {
+    "email": "user@example.com",
+    "password": "SecurePass123!",
+    "firstName": "John",
+    "lastName": "Doe"
+  }
+  
+  Success Response (200 OK):
+  {
+    "success": true,
+    "message": "User registered successfully",
+    "data": {
+      "userId": "guid",
+      "email": "user@example.com",
+      "token": "jwt_access_token_here",
+      "refreshToken": "refresh_token_here"
+    }
+  }
+  
+  Error Response (400 Bad Request):
+  {
+    "success": false,
+    "message": "Validation failed",
+    "errors": ["Email already exists", "Password too weak"]
+  }
+  
+  Notes: 
+  - Email is converted to lowercase and trimmed
+  - Password is hashed using BCrypt before storage
+  - User must verify email before full account activation
+  - Returns JWT tokens on successful registration
+
+--------------------------------------------------------------------------------
+
+Endpoint 1.2: User Login
+  Method: POST
+  Route: /api/identity/auth/login
+  Auth: None (Public)
+  Description: Authenticate user with email and password
+  
+  Request Body:
+  {
+    "email": "user@example.com",
+    "password": "SecurePass123!"
+  }
+  
+  Success Response (200 OK):
+  {
+    "success": true,
+    "message": "Login successful",
+    "data": {
+      "userId": "guid",
+      "email": "user@example.com",
+      "token": "jwt_access_token_here",
+      "refreshToken": "refresh_token_here"
+    }
+  }
+  
+  Error Response (401 Unauthorized):
+  {
+    "success": false,
+    "message": "Invalid credentials"
+  }
+  
+  Notes:
+  - Returns 401 if email or password is incorrect
+  - JWT access token expires in configured time (typically 1 hour)
+  - Refresh token valid for 7 days by default
+  - User must have verified email to login
+
+--------------------------------------------------------------------------------
+
+Endpoint 1.3: Email Verification
+  Method: POST
+  Route: /api/identity/auth/verify-email
+  Auth: None (Public)
+  Description: Verify user's email address using 6-digit OTP code
+  
+  Request Body:
+  {
+    "email": "user@example.com",
+    "otpCode": "123456"
+  }
+  
+  Success Response (200 OK):
+  {
+    "success": true,
+    "message": "Email verified successfully"
+  }
+  
+  Error Response (400 Bad Request):
+  {
+    "success": false,
+    "message": "Invalid or expired OTP"
+  }
+  
+  Notes:
+  - OTP is sent during registration
+  - OTP expires after 5 minutes
+  - OTP can only be used once
+  - User account remains inactive until email verified
+
+--------------------------------------------------------------------------------
+
+Endpoint 1.4: Token Refresh
+  Method: POST
+  Route: /api/identity/auth/refresh
+  Auth: None (Public)
+  Description: Exchange refresh token for new JWT access token
+  
+  Request Body:
+  {
+    "refreshToken": "refresh_token_here"
+  }
+  
+  Success Response (200 OK):
+  {
+    "success": true,
+    "data": {
+      "token": "new_jwt_access_token",
+      "refreshToken": "new_refresh_token"
+    }
+  }
+  
+  Error Response (401 Unauthorized):
+  {
+    "success": false,
+    "message": "Invalid or expired refresh token"
+  }
+  
+  Notes:
+  - Used when access token expires
+  - Old refresh token is invalidated
+  - New refresh token is issued (rotation)
+  - Revoked tokens cannot be reused
+
+--------------------------------------------------------------------------------
+
+Endpoint 1.5: Forgot Password
+  Method: POST
+  Route: /api/identity/auth/forgot-password
+  Auth: None (Public)
+  Description: Request OTP for password reset
+  
+  Request Body:
+  {
+    "email": "user@example.com"
+  }
+  
+  Response (200 OK):
+  {
+    "success": true,
+    "message": "If the email exists, an OTP has been sent"
+  }
+  
+  Notes:
+  - ALWAYS returns 200 OK for security
+  - Prevents email enumeration attacks
+  - If email doesn't exist, no OTP is sent
+  - OTP sent via email with 5-minute expiry
+  - OTP purpose is set to "PasswordReset"
+
+--------------------------------------------------------------------------------
+
+Endpoint 1.6: Reset Password
+  Method: POST
+  Route: /api/identity/auth/reset-password
+  Auth: None (Public)
+  Description: Reset password using OTP verification
+  
+  Request Body:
+  {
+    "email": "user@example.com",
+    "otpCode": "123456",
+    "newPassword": "NewSecurePass456!"
+  }
+  
+  Success Response (200 OK):
+  {
+    "success": true,
+    "message": "Password reset successfully"
+  }
+  
+  Error Response (400 Bad Request):
+  {
+    "success": false,
+    "message": "Invalid or expired OTP"
+  }
+  
+  Notes:
+  - OTP must be valid and not expired
+  - New password is hashed with BCrypt
+  - All existing refresh tokens are invalidated
+  - User must login again with new password
+
+--------------------------------------------------------------------------------
+2. USER PROFILE ENDPOINTS (Authentication Required)
+--------------------------------------------------------------------------------
+
+Endpoint 1.7: Get User Profile
+  Method: GET
+  Route: /api/identity/users/me
+  Auth: JWT Required
+  Description: Get current authenticated user's profile information
+  
+  Request:
+    Headers:
+      Authorization: Bearer <jwt_token>
+  
+  Success Response (200 OK):
+  {
+    "success": true,
+    "data": {
+      "userId": "guid",
+      "email": "user@example.com",
+      "firstName": "John",
+      "lastName": "Doe",
+      "fullName": "John Doe",
+      "role": "User",
+      "isEmailVerified": true,
+      "isActive": true,
+      "createdAt": "2026-04-01T10:00:00Z"
+    }
+  }
+  
+  Error Response (404 Not Found):
+  {
+    "success": false,
+    "message": "User not found"
+  }
+  
+  Notes:
+  - User ID extracted from JWT token (NameIdentifier claim)
+  - Returns full profile including computed fields
+  - Requires valid, non-expired JWT token
+
+================================================================================
+                          PAYMENT SERVICE
+================================================================================
+
+Service: Payment Service
+Base Path: /api
+Description: Handles payment processing, transaction tracking, risk assessment,
+             fraud detection, and external bill payments.
+Database: SQL Server - Payment database
+Auth: JWT Bearer tokens
+
+--------------------------------------------------------------------------------
+3. PAYMENT ENDPOINTS (Authentication Required)
+--------------------------------------------------------------------------------
+
+Endpoint 2.1: Initiate Payment
+  Method: POST
+  Route: /api/payments
+  Auth: JWT Required
+  Description: Initiate a new payment transaction
+  
+  Request Body:
+  {
+    "billId": "guid",
+    "amount": 5000.00,
+    "paymentType": "Full"  // Full, Minimum, or Custom
+  }
+  
+  Success Response (200 OK):
+  {
+    "success": true,
+    "message": "Payment initiated successfully",
+    "data": {
+      "paymentId": "guid",
+      "status": "Initiated",
+      "amount": 5000.00
+    }
+  }
+  
+  Notes:
+  - UserId automatically extracted from JWT token
+  - Payment created in "Initiated" status
+  - Triggers risk assessment
+  - Publishes PaymentInitiatedEvent to RabbitMQ
+
+--------------------------------------------------------------------------------
+
+Endpoint 2.2: Complete Payment
+  Method: PUT
+  Route: /api/payments/{id}/complete
+  Auth: JWT Required
+  Description: Complete an initiated payment after OTP verification
+  
+  Route Parameters:
+    id (GUID) - Payment ID to complete
+  
+  Success Response (200 OK):
+  {
+    "success": true,
+    "message": "Payment completed successfully"
+  }
+  
+  Error Response (400 Bad Request):
+  {
+    "success": false,
+    "message": "Payment already completed"
+  }
+  
+  Notes:
+  - Changes payment status to "Completed"
+  - Clears OTP from payment record
+  - Publishes PaymentCompletedEvent to RabbitMQ
+  - Triggers billing service to update bill
+
+--------------------------------------------------------------------------------
+
+Endpoint 2.3: Reverse Payment
+  Method: PUT
+  Route: /api/payments/{id}/reverse
+  Auth: JWT Required
+  Description: Reverse (refund) a completed payment
+  
+  Route Parameters:
+    id (GUID) - Payment ID to reverse
+  
+  Success Response (200 OK):
+  {
+    "success": true,
+    "message": "Payment reversed successfully"
+  }
+  
+  Notes:
+  - Creates reversal transaction in ledger
+  - Changes payment status to "Reversed"
+  - Can only reverse completed payments
+
+--------------------------------------------------------------------------------
+
+Endpoint 2.4: Get All Payments
+  Method: GET
+  Route: /api/payments
+  Auth: JWT Required
+  Description: Get all payments for the current user
+  
+  Query Parameters: None (UserId from JWT)
+  
+  Success Response (200 OK):
+  {
+    "success": true,
+    "data": [
+      {
+        "paymentId": "guid",
+        "billId": "guid",
+        "amount": 5000.00,
+        "status": "Completed",
+        "paymentType": "Full",
+        "createdAt": "2026-04-10T10:00:00Z"
+      }
+    ]
+  }
+  
+  Notes:
+  - Returns only non-deleted payments
+  - UserId extracted from JWT token
+
+--------------------------------------------------------------------------------
+
+Endpoint 2.5: Get Payment By ID
+  Method: GET
+  Route: /api/payments/{id}
+  Auth: JWT Required
+  Description: Get specific payment details by ID
+  
+  Route Parameters:
+    id (GUID) - Payment ID
+  
+  Success Response (200 OK):
+  {
+    "success": true,
+    "data": {
+      "paymentId": "guid",
+      "userId": "guid",
+      "billId": "guid",
+      "amount": 5000.00,
+      "status": "Completed",
+      "createdAt": "2026-04-10T10:00:00Z"
+    }
+  }
+  
+  Error Response (404 Not Found):
+  {
+    "success": false,
+    "message": "Payment not found"
+  }
+
+--------------------------------------------------------------------------------
+4. TRANSACTION ENDPOINTS (Authentication Required)
+--------------------------------------------------------------------------------
+
+Endpoint 2.6: Get All Transactions
+  Method: GET
+  Route: /api/transactions
+  Auth: JWT Required
+  Description: Get all transactions (ledger entries) for current user
+  
+  Query Parameters:
+    cardId (GUID, optional) - Filter by specific card
+  
+  Success Response (200 OK):
+  {
+    "success": true,
+    "data": [
+      {
+        "transactionId": "guid",
+        "paymentId": "guid",
+        "amount": 5000.00,
+        "type": "Payment",  // Payment or Reversal
+        "category": "Credit Card",
+        "description": "Payment for April 2026",
+        "createdAt": "2026-04-10T10:00:00Z"
+      }
+    ]
+  }
+  
+  Notes:
+  - Returns both Payment and Reversal transactions
+  - UserId extracted from JWT token
+
+--------------------------------------------------------------------------------
+
+Endpoint 2.7: Sync Transactions
+  Method: POST
+  Route: /api/transactions/sync
+  Auth: JWT Required
+  Description: Sync legacy payment records to transaction ledger
+  
+  Success Response (200 OK):
+  {
+    "success": true,
+    "message": "Transactions synced successfully",
+    "data": {
+      "syncedCount": 5
+    }
+  }
+  
+  Notes:
+  - Migrates old payment records to new transaction system
+  - Creates transaction entries for each payment
+  - UserId extracted from JWT token
+
+--------------------------------------------------------------------------------
+
+Endpoint 2.8: Get Risk Score
+  Method: GET
+  Route: /api/transactions/risk/{paymentId}
+  Auth: JWT Required
+  Description: Get risk assessment score for a payment
+  
+  Route Parameters:
+    paymentId (GUID) - Payment ID to check
+  
+  Success Response (200 OK):
+  {
+    "success": true,
+    "data": {
+      "score": 25.5,
+      "decision": "AutoApproved",  // AutoApproved, OTPRequired, or Blocked
+      "createdAt": "2026-04-10T10:00:00Z"
+    }
+  }
+  
+  Error Response (404 Not Found):
+  {
+    "success": false,
+    "message": "Risk score not found"
+  }
+  
+  Notes:
+  - Risk score 0-100 (higher = riskier)
+  - < 30: Auto-approved
+  - 30-70: OTP required
+  - > 70: Payment blocked
+
+--------------------------------------------------------------------------------
+5. EXTERNAL BILL PAYMENT ENDPOINTS (Authentication Required)
+--------------------------------------------------------------------------------
+
+Endpoint 2.9: Initiate External Bill Payment
+  Method: POST
+  Route: /api/external-bills/pay
+  Auth: JWT Required
+  Description: Initiate payment for external bills (electricity, water, gas, etc.)
+  
+  Request Body:
+  {
+    "cardId": "guid",
+    "billerName": "BSES Delhi",
+    "billerCategory": "Electricity",
+    "billNumber": "EB12345678",
+    "amount": 2500.00
+  }
+  
+  Success Response (200 OK):
+  {
+    "success": true,
+    "message": "External bill payment initiated",
+    "data": {
+      "paymentId": "guid",
+      "status": "Initiated"
+    }
+  }
+  
+  Notes:
+  - UserId extracted from JWT token
+  - Triggers OTP verification flow
+  - 15-minute OTP expiry (longer than regular payments)
+
+--------------------------------------------------------------------------------
+
+Endpoint 2.10: Verify External Bill Payment
+  Method: PUT
+  Route: /api/external-bills/{id}/verify
+  Auth: JWT Required
+  Description: Verify OTP and complete external bill payment
+  
+  Route Parameters:
+    id (GUID) - External bill payment ID
+  
+  Request Body:
+  {
+    "otpCode": "123456"
+  }
+  
+  Success Response (200 OK):
+  {
+    "success": true,
+    "message": "External bill payment completed"
+  }
+  
+  Error Response (400 Bad Request):
+  {
+    "success": false,
+    "message": "Invalid or expired OTP"
+  }
+
+--------------------------------------------------------------------------------
+
+Endpoint 2.11: Get External Bill Payments
+  Method: GET
+  Route: /api/external-bills
+  Auth: JWT Required
+  Description: Get all external bill payments for current user
+  
+  Success Response (200 OK):
+  {
+    "success": true,
+    "data": [
+      {
+        "paymentId": "guid",
+        "billerName": "BSES Delhi",
+        "billerCategory": "Electricity",
+        "billNumber": "EB12345678",
+        "amount": 2500.00,
+        "status": "Completed",
+        "createdAt": "2026-04-10T10:00:00Z"
+      }
+    ]
+  }
+
+================================================================================
+                          BILLING SERVICE
+================================================================================
+
+Service: Billing Service
+Base Path: /api/billing
+Description: Handles bill generation, payment scheduling, spending tracking,
+             and reward point management.
+Database: SQL Server - Billing database
+Auth: JWT Bearer tokens
+
+--------------------------------------------------------------------------------
+6. BILL ENDPOINTS (Authentication Required)
+--------------------------------------------------------------------------------
+
+Endpoint 3.1: Generate Bill
+  Method: POST
+  Route: /api/billing/bills
+  Auth: JWT Required
+  Description: Generate a new bill for a user's credit card
+  
+  Request Body:
+  {
+    "userId": "guid",
+    "cardId": "guid",
+    "totalAmount": 15000.00,
+    "minimumDue": 1500.00,
+    "dueDate": "2026-05-01T00:00:00Z",
+    "billingMonth": "April 2026"
+  }
+  
+  Success Response (200 OK):
+  {
+    "success": true,
+    "message": "Bill generated successfully",
+    "data": {
+      "billId": "guid",
+      "userId": "guid",
+      "cardId": "guid",
+      "totalAmount": 15000.00,
+      "minimumDue": 1500.00,
+      "amountPaid": 0,
+      "remainingBalance": 15000.00,
+      "status": "Pending",
+      "dueDate": "2026-05-01T00:00:00Z",
+      "billingMonth": "April 2026"
+    }
+  }
+  
+  Notes:
+  - Creates bill in "Pending" status
+  - Triggers BillGeneratedEvent to RabbitMQ
+  - Due date must be in the future
+
+--------------------------------------------------------------------------------
+
+Endpoint 3.2: Update Bill Status
+  Method: PUT
+  Route: /api/billing/bills/{billId}/status
+  Auth: JWT Required
+  Description: Update bill status (mark as Paid or Overdue)
+  
+  Route Parameters:
+    billId (GUID) - Bill ID to update
+  
+  Request Body:
+  {
+    "status": "Paid"  // Paid, Overdue, PartiallyPaid
+  }
+  
+  Success Response (200 OK):
+  {
+    "success": true,
+    "message": "Bill status updated"
+  }
+  
+  Notes:
+  - Typically updated via event consumption
+  - "Paid" when payment completed
+  - "Overdue" when past due date without payment
+
+--------------------------------------------------------------------------------
+
+Endpoint 3.3: Get User Bills
+  Method: GET
+  Route: /api/billing/bills/user/{userId}
+  Auth: JWT Required
+  Description: Get all bills for a user with optional filters
+  
+  Route Parameters:
+    userId (GUID) - User ID
+  
+  Query Parameters:
+    status (string, optional) - Filter by status (Pending, Paid, Overdue)
+    billingMonth (string, optional) - Filter by billing month
+  
+  Success Response (200 OK):
+  {
+    "success": true,
+    "data": [
+      {
+        "billId": "guid",
+        "totalAmount": 15000.00,
+        "minimumDue": 1500.00,
+        "amountPaid": 15000.00,
+        "remainingBalance": 0,
+        "status": "Paid",
+        "dueDate": "2026-05-01T00:00:00Z",
+        "billingMonth": "April 2026"
+      }
+    ]
+  }
+
+--------------------------------------------------------------------------------
+
+Endpoint 3.4: Get Bill By ID
+  Method: GET
+  Route: /api/billing/bills/{billId}
+  Auth: JWT Required
+  Description: Get specific bill details by ID
+  
+  Route Parameters:
+    billId (GUID) - Bill ID
+  
+  Success Response (200 OK):
+  {
+    "success": true,
+    "data": {
+      "billId": "guid",
+      "userId": "guid",
+      "cardId": "guid",
+      "totalAmount": 15000.00,
+      "minimumDue": 1500.00,
+      "amountPaid": 15000.00,
+      "remainingBalance": 0,
+      "status": "Paid",
+      "dueDate": "2026-05-01T00:00:00Z",
+      "billingMonth": "April 2026"
+    }
+  }
+  
+  Error Response (404 Not Found):
+  {
+    "success": false,
+    "message": "Bill not found"
+  }
+
+--------------------------------------------------------------------------------
+
+Endpoint 3.5: Get Upcoming Bills
+  Method: GET
+  Route: /api/billing/bills/user/{userId}/upcoming
+  Auth: JWT Required
+  Description: Get bills due in the next N days
+  
+  Route Parameters:
+    userId (GUID) - User ID
+  
+  Query Parameters:
+    days (int, default: 7) - Number of days to look ahead
+  
+  Success Response (200 OK):
+  {
+    "success": true,
+    "data": [
+      {
+        "billId": "guid",
+        "totalAmount": 15000.00,
+        "dueDate": "2026-04-15T00:00:00Z",
+        "daysUntilDue": 4
+      }
+    ]
+  }
+  
+  Notes:
+  - Only returns bills with "Pending" or "PartiallyPaid" status
+  - Helps users plan upcoming payments
+
+--------------------------------------------------------------------------------
+
+Endpoint 3.6: Get Spending Summary
+  Method: GET
+  Route: /api/billing/bills/user/{userId}/summary
+  Auth: JWT Required
+  Description: Get spending summary across all user's cards
+  
+  Route Parameters:
+    userId (GUID) - User ID
+  
+  Success Response (200 OK):
+  {
+    "success": true,
+    "data": {
+      "totalSpent": 50000.00,
+      "totalBills": 5,
+      "averageBillAmount": 10000.00,
+      "categoryBreakdown": {
+        "Shopping": 20000.00,
+        "Dining": 15000.00,
+        "Travel": 15000.00
+      }
+    }
+  }
+  
+  Notes:
+  - Aggregates spending across all cards
+  - Useful for budget tracking
+
+--------------------------------------------------------------------------------
+7. PAYMENT SCHEDULE ENDPOINTS (Authentication Required)
+--------------------------------------------------------------------------------
+
+Endpoint 3.7: Schedule Payment
+  Method: POST
+  Route: /api/billing/schedules
+  Auth: JWT Required
+  Description: Schedule a future automated payment for a bill
+  
+  Request Body:
+  {
+    "billId": "guid",
+    "scheduledDate": "2026-04-30T10:00:00Z",
+    "amount": 15000.00
+  }
+  
+  Success Response (200 OK):
+  {
+    "success": true,
+    "message": "Payment scheduled successfully",
+    "data": {
+      "scheduleId": "guid",
+      "status": "Pending"
+    }
+  }
+  
+  Notes:
+  - Scheduled date must be in the future
+  - Payment auto-executes on scheduled date
+  - Triggers BillDueReminderEvent before execution
+
+--------------------------------------------------------------------------------
+
+Endpoint 3.8: Cancel Scheduled Payment
+  Method: PUT
+  Route: /api/billing/schedules/{scheduleId}/cancel
+  Auth: JWT Required
+  Description: Cancel a pending scheduled payment
+  
+  Route Parameters:
+    scheduleId (GUID) - Schedule ID to cancel
+  
+  Success Response (200 OK):
+  {
+    "success": true,
+    "message": "Payment schedule cancelled"
+  }
+  
+  Error Response (400 Bad Request):
+  {
+    "success": false,
+    "message": "Only pending schedules can be cancelled"
+  }
+
+================================================================================
+                          CARD SERVICE
+================================================================================
+
+Service: Card Service
+Base Path: /api
+Description: Manages credit card registration, verification, settings,
+             and encrypted card data storage.
+Database: SQL Server - Card database
+Auth: JWT Bearer tokens
+Security: Card numbers encrypted at rest using AES encryption
+
+--------------------------------------------------------------------------------
+8. CARD ENDPOINTS (Authentication Required)
+--------------------------------------------------------------------------------
+
+Endpoint 4.1: Add Card
+  Method: POST
+  Route: /api/cards
+  Auth: JWT Required
+  Description: Add a new credit card to user's account
+  
+  Request Body:
+  {
+    "cardNumber": "1234567890123456",
+    "cardholderName": "JOHN DOE",
+    "expiryMonth": 12,
+    "expiryYear": 2028,
+    "issuerId": "guid",
+    "creditLimit": 100000.00,
+    "billingCycleStartDay": 15
+  }
+  
+  Success Response (200 OK):
+  {
+    "success": true,
+    "message": "Card added successfully",
+    "data": {
+      "cardId": "guid",
+      "maskedNumber": "XXXX-XXXX-XXXX-3456",
+      "cardholderName": "JOHN DOE",
+      "isVerified": false
+    }
+  }
+  
+  Notes:
+  - UserId extracted from JWT token (security)
+  - Card number encrypted with AES before storage
+  - Only last 4 digits stored in plain text
+  - Card requires verification before use
+
+--------------------------------------------------------------------------------
+
+Endpoint 4.2: Remove Card
+  Method: DELETE
+  Route: /api/cards/{id}
+  Auth: JWT Required
+  Description: Soft-delete a credit card
+  
+  Route Parameters:
+    id (GUID) - Card ID to remove
+  
+  Success Response (200 OK):
+  {
+    "success": true,
+    "message": "Card removed successfully"
+  }
+  
+  Notes:
+  - Soft delete: card marked as deleted, not removed from DB
+  - DeletedAt timestamp recorded
+  - Cannot be used for new payments
+
+--------------------------------------------------------------------------------
+
+Endpoint 4.3: Set Default Card
+  Method: PUT
+  Route: /api/cards/{id}/default
+  Auth: JWT Required
+  Description: Set a card as the default payment method
+  
+  Route Parameters:
+    id (GUID) - Card ID to set as default
+  
+  Success Response (200 OK):
+  {
+    "success": true,
+    "message": "Card set as default"
+  }
+  
+  Notes:
+  - Only user's own cards can be set as default
+  - Previous default card is unset
+  - Used when no specific card selected
+
+--------------------------------------------------------------------------------
+
+Endpoint 4.4: Verify Card
+  Method: PUT
+  Route: /api/cards/{id}/verify
+  Auth: JWT Required
+  Description: Verify card ownership via Rs.1 micro-authorization
+  
+  Route Parameters:
+    id (GUID) - Card ID to verify
+  
+  Success Response (200 OK):
+  {
+    "success": true,
+    "message": "Card verified successfully"
+  }
+  
+  Notes:
+  - Charges Rs.1 to card for verification
+  - Common pattern to prevent fraud
+  - Card must be verified before use
+
+--------------------------------------------------------------------------------
+
+Endpoint 4.5: Update Card Limit
+  Method: PUT
+  Route: /api/cards/{id}/limit
+  Auth: JWT Required
+  Description: Update credit limit for a card
+  
+  Route Parameters:
+    id (GUID) - Card ID
+  
+  Request Body:
+  {
+    "newLimit": 150000.00
+  }
+  
+  Success Response (200 OK):
+  {
+    "success": true,
+    "message": "Credit limit updated"
+  }
+  
+  Notes:
+  - May trigger creditworthiness checks
+  - Higher limits may require approval
+
+--------------------------------------------------------------------------------
+
+Endpoint 4.6: Get All Cards
+  Method: GET
+  Route: /api/cards
+  Auth: JWT Required
+  Description: Get all credit cards for current user
+  
+  Success Response (200 OK):
+  {
+    "success": true,
+    "data": [
+      {
+        "cardId": "guid",
+        "maskedNumber": "XXXX-XXXX-XXXX-3456",
+        "cardholderName": "JOHN DOE",
+        "expiryMonth": 12,
+        "expiryYear": 2028,
+        "creditLimit": 100000.00,
+        "outstandingBalance": 25000.00,
+        "availableCredit": 75000.00,
+        "utilization": 25.0,
+        "isDefault": true,
+        "isVerified": true,
+        "isExpired": false
+      }
+    ]
+  }
+  
+  Notes:
+  - Returns only non-deleted cards
+  - Includes computed fields (utilization, available credit)
+
+--------------------------------------------------------------------------------
+
+Endpoint 4.7: Get Card By ID
+  Method: GET
+  Route: /api/cards/{id}
+  Auth: JWT Required
+  Description: Get specific card details (masked)
+  
+  Route Parameters:
+    id (GUID) - Card ID
+  
+  Success Response (200 OK):
+  {
+    "success": true,
+    "data": {
+      "cardId": "guid",
+      "maskedNumber": "XXXX-XXXX-XXXX-3456",
+      "cardholderName": "JOHN DOE",
+      "issuerName": "HDFC Bank",
+      "creditLimit": 100000.00,
+      "outstandingBalance": 25000.00
+    }
+  }
+  
+  Error Response (404 Not Found):
+  {
+    "success": false,
+    "message": "Card not found"
+  }
+  
+  Notes:
+  - Returns masked card number only
+  - Use /reveal endpoint for full details
+
+--------------------------------------------------------------------------------
+
+Endpoint 4.8: Get Card Utilization
+  Method: GET
+  Route: /api/cards/utilization
+  Auth: JWT Required
+  Description: Get credit utilization summary across all user's cards
+  
+  Success Response (200 OK):
+  {
+    "success": true,
+    "data": {
+      "totalCreditLimit": 200000.00,
+      "totalOutstanding": 50000.00,
+      "totalAvailable": 150000.00,
+      "overallUtilization": 25.0
+    }
+  }
+  
+  Notes:
+  - Important for credit score management
+  - Lower utilization is better (< 30%)
+
+--------------------------------------------------------------------------------
+
+Endpoint 4.9: Reveal Card Details
+  Method: GET
+  Route: /api/cards/{id}/reveal
+  Auth: JWT Required
+  Description: Reveal full card details with decrypted sensitive information
+  
+  Route Parameters:
+    id (GUID) - Card ID
+  
+  Success Response (200 OK):
+  {
+    "success": true,
+    "data": {
+      "cardId": "guid",
+      "cardNumber": "1234567890123456",  // Decrypted
+      "cvv": "123",  // Decrypted
+      "cardholderName": "JOHN DOE",
+      "expiryMonth": 12,
+      "expiryYear": 2028
+    }
+  }
+  
+  Error Response (404 Not Found):
+  {
+    "success": false,
+    "message": "Card not found"
+  }
+  
+  Notes:
+  - Requires authentication AND ownership verification
+  - Card number decrypted from AES encryption
+  - Use with caution - sensitive data
+  - May be logged for security audit
+
+================================================================================
+                      NOTIFICATION SERVICE
+================================================================================
+
+Service: Notification Service
+Base Path: /api/notifications
+Description: Manages user notifications generated by events from other services
+             (Payment, Billing, Card). Supports multiple channels and priorities.
+Database: SQL Server - Notification database
+Auth: JWT Bearer tokens
+
+--------------------------------------------------------------------------------
+9. NOTIFICATION ENDPOINTS (Authentication Required)
+--------------------------------------------------------------------------------
+
+Endpoint 5.1: Get Notifications
+  Method: GET
+  Route: /api/notifications/user/{userId}
+  Auth: JWT Required
+  Description: Get paginated notifications for a user
+  
+  Route Parameters:
+    userId (GUID) - User ID
+  
+  Query Parameters:
+    isRead (bool, optional) - Filter by read status
+    page (int, default: 1) - Page number
+    pageSize (int, default: 20) - Items per page
+  
+  Success Response (200 OK):
+  {
+    "success": true,
+    "data": [
+      {
+        "notificationId": "guid",
+        "type": "Payment",  // Payment, Security, Billing, Reward, Card, System
+        "title": "Payment Successful",
+        "message": "Your payment of Rs. 5,000 was completed successfully",
+        "channel": "InApp",  // Email, SMS, Push, InApp
+        "priority": "Normal",  // Low, Normal, High, Critical
+        "isRead": false,
+        "referenceId": "guid",  // Related PaymentId, BillId, etc.
+        "createdAt": "2026-04-10T10:00:00Z"
+      }
+    ],
+    "pagination": {
+      "page": 1,
+      "pageSize": 20,
+      "totalCount": 45,
+      "totalPages": 3
+    }
+  }
+  
+  Notes:
+  - Notifications created by event consumers from RabbitMQ
+  - Supports filtering by read/unread status
+  - Sorted by creation date (newest first)
+
+--------------------------------------------------------------------------------
+
+Endpoint 5.2: Get Unread Count
+  Method: GET
+  Route: /api/notifications/user/{userId}/unread-count
+  Auth: JWT Required
+  Description: Get count of unread notifications
+  
+  Route Parameters:
+    userId (GUID) - User ID
+  
+  Success Response (200 OK):
+  {
+    "success": true,
+    "data": {
+      "unreadCount": 12
+    }
+  }
+  
+  Notes:
+  - Lightweight endpoint for badge count in UI
+  - Only returns count, not actual notifications
+
+--------------------------------------------------------------------------------
+
+Endpoint 5.3: Mark Notification As Read
+  Method: PUT
+  Route: /api/notifications/{notificationId}/read
+  Auth: JWT Required
+  Description: Mark a single notification as read
+  
+  Route Parameters:
+    notificationId (GUID) - Notification ID
+  
+  Success Response (200 OK):
+  {
+    "success": true,
+    "message": "Notification marked as read"
+  }
+  
+  Notes:
+  - Sets IsRead flag to true
+  - Records ReadAt timestamp
+
+--------------------------------------------------------------------------------
+
+Endpoint 5.4: Mark All Notifications As Read
+  Method: PUT
+  Route: /api/notifications/user/{userId}/read-all
+  Auth: JWT Required
+  Description: Mark all notifications as read for a user
+  
+  Route Parameters:
+    userId (GUID) - User ID
+  
+  Success Response (200 OK):
+  {
+    "success": true,
+    "message": "All notifications marked as read",
+    "data": {
+      "markedCount": 12
+    }
+  }
+  
+  Notes:
+  - Bulk operation - more efficient than individual calls
+  - Only marks unread notifications
+
+================================================================================
+                          API GATEWAY
+================================================================================
+
+Service: Ocelot API Gateway
+Port: Varies (check configuration)
+Description: Routes incoming requests to appropriate microservice
+
+Routes:
+  /api/identity/*  -> Identity Service
+  /api/payments/*  -> Payment Service
+  /api/transactions/*  -> Payment Service
+  /api/external-bills/*  -> Payment Service
+  /api/billing/*  -> Billing Service
+  /api/cards/*  -> Card Service
+  /api/notifications/*  -> Notification Service
+
+Health Check:
+  GET /health
+  Response:
+  {
+    "status": "healthy",
+    "service": "service-name",
+    "time": "2026-04-11T10:00:00Z"
+  }
+
+================================================================================
+                          ERROR RESPONSES
+================================================================================
+
+All endpoints return errors in consistent format:
+
+Validation Error (400):
+{
+  "success": false,
+  "message": "Validation failed",
+  "errors": ["Field1 is required", "Field2 must be positive"]
+}
+
+Not Found (404):
+{
+  "success": false,
+  "message": "Resource not found"
+}
+
+Unauthorized (401):
+{
+  "success": false,
+  "message": "You are not authorized to perform this action"
+}
+
+Internal Server Error (500):
+{
+  "success": false,
+  "message": "An internal error occurred. Please try again."
+}
+
+================================================================================
+                          AUTHENTICATION FLOW
+================================================================================
+
+1. User Registration:
+   POST /api/identity/auth/register -> Get JWT tokens
+   
+2. Login:
+   POST /api/identity/auth/login -> Get JWT tokens
+   
+3. Email Verification:
+   POST /api/identity/auth/verify-email -> Activate account
+   
+4. Use API:
+   Include "Authorization: Bearer <token>" header in all requests
+   
+5. Token Refresh:
+   POST /api/identity/auth/refresh -> Get new tokens when expired
+   
+6. Forgot Password:
+   POST /api/identity/auth/forgot-password -> Get OTP
+   POST /api/identity/auth/reset-password -> Reset with OTP
+
+================================================================================
+                          INTER-SERVICE EVENTS
+================================================================================
+
+Events published to RabbitMQ via MassTransit:
+
+From Identity Service:
+  - UserRegisteredEvent (on user registration)
+  - PasswordResetRequestedEvent (on password reset request)
+
+From Payment Service:
+  - PaymentInitiatedEvent (on payment start)
+  - PaymentCompletedEvent (on payment success)
+  - PaymentFailedEvent (on payment failure)
+  - FraudDetectedEvent (on fraud detection)
+  - ExternalBillPaidEvent (on external bill payment)
+
+From Billing Service:
+  - BillGeneratedEvent (on bill creation)
+  - BillDueReminderEvent (before bill due date)
+  - RewardEarnedEvent (on reward points earned)
+
+From Card Service:
+  - CardAddedEvent (on new card registration)
+  - CardExpirySoonEvent (before card expiry)
+
+Consumers:
+  NotificationService consumes most events to create user notifications
+  BillingService consumes PaymentCompletedEvent to update bills
+  CardService consumes ExternalBillPaidEvent to update card balances
+
+================================================================================
+                          TESTING THE API
+================================================================================
+
+1. Start all services (docker-compose up)
+2. Access Swagger UI: http://localhost:[port]/swagger
+3. Register a user: POST /api/identity/auth/register
+4. Login: POST /api/identity/auth/login
+5. Copy the "token" from login response
+6. In Swagger, click "Authorize" and enter: Bearer <token>
+7. Test other endpoints with the token
+
+Using cURL:
+
+  # Register
+  curl -X POST http://localhost:5001/api/identity/auth/register \
+    -H "Content-Type: application/json" \
+    -d '{"email":"test@test.com","password":"Pass123!","firstName":"Test","lastName":"User"}'
+
+  # Login
+  curl -X POST http://localhost:5001/api/identity/auth/login \
+    -H "Content-Type: application/json" \
+    -d '{"email":"test@test.com","password":"Pass123!"}'
+
+  # Add card (replace TOKEN with actual JWT)
+  curl -X POST http://localhost:5003/api/cards \
+    -H "Content-Type: application/json" \
+    -H "Authorization: Bearer TOKEN" \
+    -d '{"cardNumber":"1234567890123456","cardholderName":"TEST USER",...}'
+
+================================================================================
+                          END OF API REFERENCE
+================================================================================
+
+Document Version: 1.0
+Last Updated: April 11, 2026
+Total Endpoints: 39
+  - Public: 6
+  - Authenticated: 33
+
+Services:
+  - Identity Service: 7 endpoints
+  - Payment Service: 11 endpoints
+  - Billing Service: 8 endpoints
+  - Card Service: 9 endpoints
+  - Notification Service: 4 endpoints
+
+For questions or issues, refer to:
+  - README.md in project root
+  - Swagger UI at /swagger for each service
+  - Source code comments in controller files
+
+================================================================================

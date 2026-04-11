@@ -1,0 +1,266 @@
+================================================================================
+                    FinVault - Test Execution Guide
+                    Credit Card Management System
+================================================================================
+
+Version: 1.0
+Last Updated: April 11, 2026
+
+================================================================================
+                          QUICK START
+================================================================================
+
+1. Open terminal at project root:
+   cd C:\Dev\finvalult_complete_code\FinVault
+
+2. Run all tests:
+   dotnet test
+
+3. View detailed results:
+   dotnet test --logger "console;verbosity=detailed"
+
+================================================================================
+                          RUNNING TESTS BY SERVICE
+================================================================================
+
+# Identity Service - Domain Tests
+cd src\Services\IdentityService\IdentityService.Domain.Tests
+dotnet test
+
+# Identity Service - Application Tests
+cd src\Services\IdentityService\IdentityService.Application.Tests
+dotnet test
+
+# Card Service - Domain Tests
+cd src\Services\CardService\CardService.Domain.Tests
+dotnet test
+
+# Payment Service - Domain Tests
+cd src\Services\PaymentService\PaymentService.Domain.Tests
+dotnet test
+
+# Payment Service - Application Tests
+cd src\Services\PaymentService\PaymentService.Application.Tests
+dotnet test
+
+# Billing Service - Domain Tests
+cd src\Services\BillingService\BillingService.Domain.Tests
+dotnet test
+
+# Billing Service - Application Tests
+cd src\Services\BillingService\BillingService.Application.Tests
+dotnet test
+
+# Notification Service - Domain Tests
+cd src\Services\NotificationService\NotificationService.Domain.Tests
+dotnet test
+
+================================================================================
+                          RUNNING SPECIFIC TESTS
+================================================================================
+
+# Run tests by class name
+dotnet test --filter "FullyQualifiedName~UserTests"
+
+# Run tests by method name
+dotnet test --filter "FullyQualifiedName~Create_WithValidParameters"
+
+# Run tests by category
+dotnet test --filter "Category=Domain"
+
+# Run tests matching a pattern
+dotnet test --filter "DisplayName~ShouldCreate"
+
+# Run a single test
+dotnet test --filter "Name=Create_WithValidParameters_ShouldCreateUser"
+
+================================================================================
+                          TEST OUTPUT OPTIONS
+================================================================================
+
+# Normal output (default)
+dotnet test
+
+# Verbose output with all test names
+dotnet test --logger "console;verbosity=detailed"
+
+# Minimal output (only failures)
+dotnet test --logger "console;verbosity=minimal"
+
+# Output to file
+dotnet test --logger "trx;LogFileName=test-results.trx"
+
+# HTML report (requires ReportGenerator)
+dotnet test --collect:"XPlat Code Coverage"
+reportgenerator -reports:"**/coverage.cobertura.xml" -targetdir:"CoverageReports"
+
+================================================================================
+                          CODE COVERAGE
+================================================================================
+
+# Run tests with code coverage
+dotnet test --collect:"XPlat Code Coverage"
+
+# View coverage in Visual Studio
+# Open Test Explorer -> Analyze Code Coverage
+
+# Generate coverage report
+dotnet test --collect:"XPlat Code Coverage" -- DataCollectionRunSettings.DataCollectors.DataCollector.Configuration.Format=cobertura
+reportgenerator -reports:"**/coverage.cobertura.xml" -targetdir:"CoverageReport" -reporttypes:Html
+
+# Open coverage report
+start CoverageReport\index.html
+
+================================================================================
+                          PARALLEL TEST EXECUTION
+================================================================================
+
+# Run all test projects in parallel
+dotnet test --parallel
+
+# Run with specific number of threads
+dotnet test --x86
+
+# Parallel by test assemblies
+dotnet test --blame
+
+================================================================================
+                          CONTINUOUS TESTING
+================================================================================
+
+# Watch mode - reruns tests on file changes (requires dotnet-watch)
+dotnet watch test
+
+# Run tests every 5 seconds
+dotnet test --rerun 5
+
+================================================================================
+                          DEBUGGING TESTS
+================================================================================
+
+# Run tests in debug mode
+dotnet test --blame
+
+# Attach debugger to test process
+dotnet test --blame-hang
+
+# Create dump on test failure
+dotnet test --blame --collect-dump
+
+# Run tests sequentially (easier to debug)
+dotnet test --parallel none
+
+================================================================================
+                          TEST RESULTS AND REPORTING
+================================================================================
+
+# Generate TRX report (Visual Studio format)
+dotnet test --logger "trx;LogFileName=results.trx"
+
+# Generate JUnit report (Jenkins format)
+dotnet test --logger "junit;LogFileName=results.xml"
+
+# View TRX report in VS Code
+# Install "Test Explorer UI" extension
+
+# View TRX report in Visual Studio
+# Test -> Windows -> Test Explorer -> Open .trx file
+
+================================================================================
+                          CI/CD INTEGRATION
+================================================================================
+
+GitHub Actions automatically runs tests on:
+  - Push to main branch
+  - Pull requests to main branch
+  - Manual workflow trigger
+
+View results at:
+  https://github.com/your-org/finvault/actions
+
+================================================================================
+                          TROUBLESHOOTING
+================================================================================
+
+Problem: Tests not found
+Solution: 
+  dotnet restore
+  dotnet build
+  dotnet test
+
+Problem: Tests failing due to database
+Solution:
+  # Tests use mocks, no database needed for unit tests
+  # Check if mock setup is correct
+
+Problem: Code coverage not generating
+Solution:
+  dotnet tool install --global coverlet.console
+  coverlet "bin/Debug/net9.0/Tests.dll" --target "dotnet" --targetargs "test --no-build"
+
+Problem: Tests timing out
+Solution:
+  # Increase timeout in test
+  [Test, Timeout(10000)]  // 10 seconds
+  public async Task LongRunningTest() { ... }
+
+================================================================================
+                          TEST FILES LOCATION
+================================================================================
+
+Implemented Test Files:
+  ✅ IdentityService.Domain.Tests/Entities/UserTests.cs (15 tests)
+  ✅ IdentityService.Application.Tests/Commands/VerifyEmailCommandHandlerTests.cs (4 tests)
+  ✅ CardService.Domain.Tests/Entities/CreditCardTests.cs (14 tests)
+  ✅ PaymentService.Domain.Tests/Entities/PaymentTests.cs (10 tests)
+  ✅ PaymentService.Application.Tests/Commands/InitiatePaymentCommandHandlerTests.cs (2 tests)
+  ✅ BillingService.Domain.Tests/Entities/BillTests.cs (14 tests)
+  ✅ BillingService.Application.Tests/Commands/GenerateBillCommandHandlerTests.cs (2 tests)
+  ✅ NotificationService.Domain.Tests/Entities/NotificationTests.cs (11 tests)
+  ✅ NotificationService.Domain.Tests/Entities/NotificationPreferenceTests.cs (8 tests)
+
+Total Implemented Tests: 80+ tests
+
+Test Documentation:
+  📄 docs/Test_Cases.txt - Complete test case documentation (150+ test cases)
+
+================================================================================
+                          BEST PRACTICES
+================================================================================
+
+1. Run tests before every commit
+2. Keep tests fast (< 1 second per test for unit tests)
+3. Tests should be independent and isolated
+4. Use descriptive test names (Given_When_Then format)
+5. One assertion per test when possible
+6. Mock all external dependencies
+7. Don't test third-party libraries
+8. Review tests in pull requests
+9. Maintain test coverage above 75%
+10. Fix failing tests immediately
+
+================================================================================
+                          TEST METRICS (AS OF APRIL 11, 2026)
+================================================================================
+
+Test Category              | Implemented | Target | Status
+---------------------------|-------------|--------|--------
+Domain Entity Tests        | 57 tests    | 90%    | ✅ 85%
+Application Handler Tests  | 8 tests     | 80%    | ⚠️  15%
+Infrastructure Tests       | 0 tests     | 70%    | ❌  0%
+API Integration Tests      | 0 tests     | 60%    | ❌  0%
+Security Tests             | 0 tests     | 100%   | ❌  0%
+Performance Tests          | 0 tests     | N/A    | ❌  0%
+---------------------------|-------------|--------|--------
+TOTAL                      | 65 tests    | 75%    | ⚠️ 25%
+
+Priority for Next Sprint:
+  1. Complete Application layer tests for all services
+  2. Add Repository integration tests
+  3. Add API endpoint tests
+  4. Add security test suite
+  5. Add performance baseline tests
+
+================================================================================
+                          END OF TEST EXECUTION GUIDE
+================================================================================

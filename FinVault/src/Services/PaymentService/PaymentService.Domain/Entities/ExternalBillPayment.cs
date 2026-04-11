@@ -1,26 +1,28 @@
+// File: ExternalBillPayment.cs - Domain entity for external bill payments (electricity, water, gas, etc.) with OTP verification
 namespace PaymentService.Domain.Entities;
 
 public class ExternalBillPayment
 {
-    public Guid Id { get; private set; }
-    public Guid UserId { get; private set; }
-    public Guid CardId { get; private set; }
-    public string BillerName { get; private set; } = string.Empty;
-    public string BillerCategory { get; private set; } = string.Empty;
-    public string BillNumber { get; private set; } = string.Empty;
-    public decimal Amount { get; private set; }
-    public string Status { get; private set; } = "Initiated";
-    public string? OtpHash { get; private set; }
-    public DateTimeOffset? OtpExpiresAt { get; private set; }
-    public string? FailureReason { get; private set; }
-    public DateTimeOffset CreatedAt { get; private set; }
-    public DateTimeOffset? UpdatedAt { get; private set; }
+    public Guid Id { get; private set; }  // Unique external bill payment identifier
+    public Guid UserId { get; private set; }  // User making the payment
+    public Guid CardId { get; private set; }  // Card used for payment
+    public string BillerName { get; private set; } = string.Empty;  // Biller company name
+    public string BillerCategory { get; private set; } = string.Empty;  // Category (Electricity, Water, Gas, etc.)
+    public string BillNumber { get; private set; } = string.Empty;  // Bill reference number
+    public decimal Amount { get; private set; }  // Payment amount
+    public string Status { get; private set; } = "Initiated";  // Payment status: Initiated, OTPSent, Completed, Failed
+    public string? OtpHash { get; private set; }  // Hashed OTP for verification
+    public DateTimeOffset? OtpExpiresAt { get; private set; }  // OTP expiration time
+    public string? FailureReason { get; private set; }  // Reason if payment failed
+    public DateTimeOffset CreatedAt { get; private set; }  // When payment was initiated
+    public DateTimeOffset? UpdatedAt { get; private set; }  // When payment was last updated
 
-    // EF Core needs this
+    // Private constructor for EF Core
     private ExternalBillPayment() { }
 
+    // Factory method to create a new external bill payment
     public static ExternalBillPayment Create(
-        Guid userId, Guid cardId, string billerName, 
+        Guid userId, Guid cardId, string billerName,
         string billerCategory, string billNumber, decimal amount)
     {
         return new ExternalBillPayment
@@ -37,6 +39,7 @@ public class ExternalBillPayment
         };
     }
 
+    // Sets OTP hash with 15-minute expiry
     public void SetOtp(string otpHash)
     {
         OtpHash = otpHash;
@@ -45,6 +48,7 @@ public class ExternalBillPayment
         UpdatedAt = DateTimeOffset.UtcNow;
     }
 
+    // Marks payment as completed and clears OTP
     public void Complete()
     {
         Status = "Completed";
@@ -53,6 +57,7 @@ public class ExternalBillPayment
         UpdatedAt = DateTimeOffset.UtcNow;
     }
 
+    // Marks payment as failed with reason and clears OTP
     public void Fail(string reason)
     {
         Status = "Failed";
@@ -62,7 +67,8 @@ public class ExternalBillPayment
         UpdatedAt = DateTimeOffset.UtcNow;
     }
 
-    // Computed properties
+    // Computed: Returns true if OTP has expired
     public bool IsOtpExpired => OtpExpiresAt.HasValue && DateTimeOffset.UtcNow >= OtpExpiresAt.Value;
+    // Computed: Returns true if payment is completed
     public bool IsCompleted => Status == "Completed";
 }

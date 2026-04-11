@@ -1,23 +1,25 @@
+// Represents a billing statement for a user's card with payment tracking
 namespace BillingService.Domain.Entities;
 
 public class Bill
 {
-    public Guid Id { get; private set; }
-    public Guid UserId { get; private set; }
-    public Guid CardId { get; private set; }
-    public decimal TotalAmount { get; private set; }
-    public decimal MinimumDue { get; private set; }
-    public decimal AmountPaid { get; private set; }
-    public DateTimeOffset DueDate { get; private set; }
-    public string BillingMonth { get; private set; } = string.Empty;
-    public string Status { get; private set; } = "Pending";
-    public bool IsDeleted { get; private set; }
-    public DateTimeOffset? DeletedAt { get; private set; }
-    public DateTimeOffset CreatedAt { get; private set; }
-    public DateTimeOffset? UpdatedAt { get; private set; }
+    public Guid Id { get; private set; }  // Unique identifier
+    public Guid UserId { get; private set; }  // Owner of the bill
+    public Guid CardId { get; private set; }  // Associated payment card
+    public decimal TotalAmount { get; private set; }  // Total amount owed
+    public decimal MinimumDue { get; private set; }  // Minimum required payment
+    public decimal AmountPaid { get; private set; }  // Amount already paid
+    public DateTimeOffset DueDate { get; private set; }  // Payment deadline
+    public string BillingMonth { get; private set; } = string.Empty;  // Billing period label
+    public string Status { get; private set; } = "Pending";  // Payment status (Pending/Paid/PartiallyPaid/Overdue)
+    public bool IsDeleted { get; private set; }  // Soft delete flag
+    public DateTimeOffset? DeletedAt { get; private set; }  // Timestamp of soft deletion
+    public DateTimeOffset CreatedAt { get; private set; }  // Record creation time
+    public DateTimeOffset? UpdatedAt { get; private set; }  // Last modification time
 
     private Bill() { } // Required by EF Core
 
+    // Factory method to create a new bill with validation
     public static Bill Create(Guid userId, Guid cardId, decimal totalAmount,
         decimal minimumDue, DateTimeOffset dueDate, string billingMonth)
     {
@@ -44,6 +46,7 @@ public class Bill
         };
     }
 
+    // Record a payment toward the bill and update status
     public void RecordPayment(decimal amount)
     {
         if (amount <= 0) throw new ArgumentException("Payment amount must be positive.");
@@ -52,6 +55,7 @@ public class Bill
         UpdatedAt = DateTimeOffset.UtcNow;
     }
 
+    // Mark the bill as overdue when past due date
     public void MarkOverdue()
     {
         if (Status == "Paid") return;
@@ -59,12 +63,14 @@ public class Bill
         UpdatedAt = DateTimeOffset.UtcNow;
     }
 
+    // Mark the bill as fully paid
     public void MarkPaid()
     {
         Status = "Paid";
         UpdatedAt = DateTimeOffset.UtcNow;
     }
 
+    // Soft delete the bill record
     public void SoftDelete()
     {
         IsDeleted = true;
@@ -72,6 +78,6 @@ public class Bill
         UpdatedAt = DateTimeOffset.UtcNow;
     }
 
-    // Computed — no DB column
+    // Computed property: remaining amount to be paid
     public decimal RemainingBalance => TotalAmount - AmountPaid;
 }

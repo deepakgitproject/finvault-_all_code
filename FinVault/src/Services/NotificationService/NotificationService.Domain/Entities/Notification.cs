@@ -1,22 +1,25 @@
+// File: Notification.cs - Domain entity for user notifications (alerts, updates, reminders)
 namespace NotificationService.Domain.Entities;
 
 public class Notification
 {
-    public Guid Id { get; private set; }
-    public Guid UserId { get; private set; }
-    public string Type { get; private set; } = string.Empty;       // Payment, Security, Billing, Reward, Card, System
-    public string Title { get; private set; } = string.Empty;
-    public string Message { get; private set; } = string.Empty;
-    public string Channel { get; private set; } = "InApp";         // Email, SMS, Push, InApp
-    public string Priority { get; private set; } = "Normal";       // Low, Normal, High, Critical
-    public bool IsRead { get; private set; }
-    public DateTimeOffset? ReadAt { get; private set; }
-    public string? ReferenceId { get; private set; }               // PaymentId, BillId, etc.
-    public string? CorrelationId { get; private set; }
-    public DateTimeOffset CreatedAt { get; private set; }
+    public Guid Id { get; private set; }  // Unique notification identifier
+    public Guid UserId { get; private set; }  // User who receives this notification
+    public string Type { get; private set; } = string.Empty;       // Notification type: Payment, Security, Billing, Reward, Card, System
+    public string Title { get; private set; } = string.Empty;  // Notification title
+    public string Message { get; private set; } = string.Empty;  // Notification body text
+    public string Channel { get; private set; } = "InApp";         // Delivery channel: Email, SMS, Push, InApp
+    public string Priority { get; private set; } = "Normal";       // Priority level: Low, Normal, High, Critical
+    public bool IsRead { get; private set; }  // Whether user has read this notification
+    public DateTimeOffset? ReadAt { get; private set; }  // When user read this notification
+    public string? ReferenceId { get; private set; }               // Related entity ID (PaymentId, BillId, etc.)
+    public string? CorrelationId { get; private set; }  // For tracking related notifications
+    public DateTimeOffset CreatedAt { get; private set; }  // When notification was created
 
-    private Notification() { } // Required by EF Core
+    // Private constructor for EF Core
+    private Notification() { }
 
+    // Factory method to create a new notification with validation
     public static Notification Create(
         Guid userId, string type, string title, string message,
         string channel = "InApp", string priority = "Normal",
@@ -43,9 +46,10 @@ public class Notification
         };
     }
 
+    // Marks notification as read with timestamp
     public void MarkAsRead()
     {
-        if (IsRead) return;
+        if (IsRead) return;  // Already marked as read
         IsRead = true;
         ReadAt = DateTimeOffset.UtcNow;
     }

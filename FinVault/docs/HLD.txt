@@ -1,0 +1,884 @@
+================================================================================
+                    FinVault - High Level Design (HLD) Document
+                    Credit Card Management System
+================================================================================
+
+Version: 1.0
+Last Updated: April 11, 2026
+Prepared By: Development Team
+Status: Final
+
+================================================================================
+                          TABLE OF CONTENTS
+================================================================================
+
+1. Introduction
+2. System Overview
+3. System Architecture
+4. Technology Stack
+5. Microservices Design
+6. Database Design
+7. API Gateway Design
+8. Inter-Service Communication
+9. Security Design
+10. Deployment Architecture
+11. Data Flow
+12. Scalability Considerations
+13. Error Handling Strategy
+14. Monitoring and Logging
+15. Future Enhancements
+
+================================================================================
+                          1. INTRODUCTION
+================================================================================
+
+1.1 Purpose
+----------
+This High Level Design (HLD) document describes the architecture, components,
+and data flows of FinVault, a microservices-based credit card management system.
+FinVault enables users to manage credit cards, make payments, track spending,
+earn rewards, and receive notifications.
+
+1.2 Scope
+---------
+The system provides:
+  - User authentication and profile management
+  - Credit card registration and encrypted storage
+  - Payment processing with OTP verification
+  - Bill generation and payment scheduling
+  - External bill payments (electricity, water, gas, etc.)
+  - Risk assessment and fraud detection
+  - Reward point management
+  - Real-time notifications
+  - Spending analytics and tracking
+
+1.3 Target Audience
+-------------------
+  - Solution Architects
+  - Development Team
+  - QA Engineers
+  - DevOps Team
+  - Project Stakeholders
+  - Academic Evaluators
+
+================================================================================
+                          2. SYSTEM OVERVIEW
+================================================================================
+
+2.1 Problem Statement
+---------------------
+Traditional credit card management systems are monolithic, difficult to scale,
+and lack modern security features. Users need a unified platform to manage
+multiple cards, track payments, prevent fraud, and receive timely notifications.
+
+2.2 Solution Approach
+---------------------
+FinVault implements a microservices architecture where each business capability
+is a separate, independently deployable service. Services communicate via
+event-driven messaging (RabbitMQ) and REST APIs. An API Gateway routes client
+requests to appropriate backend services.
+
+2.3 Key Features
+----------------
+  - Multi-service microservices architecture
+  - JWT-based authentication with refresh tokens
+  - Encrypted credit card storage (AES encryption)
+  - OTP-based payment verification
+  - Risk scoring and fraud detection
+  - Distributed transaction management (Saga pattern)
+  - Event-driven inter-service communication
+  - Real-time notifications
+  - Reward point system
+  - Payment scheduling and auto-execution
+
+2.4 Non-Functional Requirements
+-------------------------------
+  - Availability: 99.9% uptime
+  - Scalability: Horizontal scaling per service
+  - Security: AES-256 encryption, JWT auth, BCrypt passwords
+  - Performance: < 200ms response time for read operations
+  - Reliability: Distributed sagas for payment consistency
+  - Maintainability: Clean Architecture, CQRS pattern
+
+================================================================================
+                          3. SYSTEM ARCHITECTURE
+================================================================================
+
+3.1 Architecture Pattern
+------------------------
+Microservices Architecture with Clean Architecture (Onion Architecture) inside
+each service. Each service implements CQRS (Command Query Responsibility
+Segregation) using MediatR.
+
+3.2 Architecture Layers
+------------------------
+
+  ┌─────────────────────────────────────────────────────────────┐
+  │                     CLIENT TIER                              │
+  │   Web App (Angular) │ Mobile App │ Third-Party Integrations │
+  └────────────────────────┬────────────────────────────────────┘
+                           │
+                           ▼
+  ┌─────────────────────────────────────────────────────────────┐
+  │                   API GATEWAY TIER                           │
+  │                      Ocelot Gateway                          │
+  │           Routing │ Rate Limiting │ Auth Forwarding           │
+  └────────────────────────┬────────────────────────────────────┘
+                           │
+                           ▼
+  ┌─────────────────────────────────────────────────────────────┐
+  │                   SERVICE TIER (Microservices)               │
+  │  ┌──────────┐ ┌──────────┐ ┌──────────┐ ┌──────────┐       │
+  │  │Identity  │ │  Card    │ │ Billing  │ │ Payment  │       │
+  │  │ Service  │ │ Service  │ │ Service  │ │ Service  │       │
+  │  └──────────┘ └──────────┘ └──────────┘ └──────────┘       │
+  │                                                             │
+  │  ┌──────────┐                                               │
+  │  │Notification│                                             │
+  │  │ Service  │                                               │
+  │  └──────────┘                                               │
+  └────────────────────────┬────────────────────────────────────┘
+                           │
+                           ▼
+  ┌─────────────────────────────────────────────────────────────┐
+  │                  MESSAGING TIER                              │
+  │              RabbitMQ + MassTransit                          │
+  │        Event Publishing │ Event Consuming                    │
+  └────────────────────────┬────────────────────────────────────┘
+                           │
+                           ▼
+  ┌─────────────────────────────────────────────────────────────┐
+  │                   DATA TIER                                  │
+  │          SQL Server (Database per Service)                   │
+  │  ┌──────────┐ ┌──────────┐ ┌──────────┐ ┌──────────┐       │
+  │  │ Identity │ │  Card    │ │ Billing  │ │ Payment  │       │
+  │  │   DB     │ │   DB     │ │   DB     │ │   DB     │       │
+  │  └──────────┘ └──────────┘ └──────────┘ └──────────┘       │
+  │                                                             │
+  │  ┌──────────┐                                               │
+  │  │Notification│                                             │
+  │  │    DB    │                                               │
+  │  └──────────┘                                               │
+  └─────────────────────────────────────────────────────────────┘
+
+3.3 Service Boundaries
+-----------------------
+Each microservice is responsible for:
+  - Its own database (no cross-service DB access)
+  - Its own business logic and validation
+  - Publishing events when state changes
+  - Consuming events from other services
+  - Exposing REST APIs for synchronous operations
+
+================================================================================
+                          4. TECHNOLOGY STACK
+================================================================================
+
+4.1 Backend Technologies
+-------------------------
+  - Framework: ASP.NET Core 9/10 (C#)
+  - API Gateway: Ocelot
+  - CQRS/MediatR: MediatR library
+  - Validation: FluentValidation
+  - ORM: Entity Framework Core
+  - Database: Microsoft SQL Server 2022
+  - Messaging: RabbitMQ + MassTransit
+  - Authentication: JWT (JSON Web Tokens)
+  - Password Hashing: BCrypt
+  - Encryption: AES-256 for card data
+  - Logging: Serilog
+  - API Documentation: Swagger/OpenAPI
+
+4.2 Frontend Technologies
+--------------------------
+  - Framework: Angular 17+
+  - UI Library: Bootstrap 5, Material Design
+  - State Management: RxJS, NgRx
+  - HTTP Client: Angular HttpClient
+  - Authentication: JWT storage in localStorage
+
+4.3 DevOps & Infrastructure
+----------------------------
+  - Containerization: Docker
+  - Orchestration: Docker Compose
+  - CI/CD: GitHub Actions
+  - Version Control: Git
+  - Database Migrations: EF Core Migrations
+
+4.4 Testing
+-----------
+  - Unit Testing: xUnit, NUnit
+  - Mocking: Moq
+  - API Testing: Swagger UI, Postman
+  - Load Testing: JMeter (future)
+
+================================================================================
+                          5. MICROSERVICES DESIGN
+================================================================================
+
+5.1 Identity Service
+---------------------
+Responsibility: User authentication, registration, email verification, password
+                management, and user profile management.
+
+Components:
+  ├── API Layer
+  │   ├── AuthController (register, login, verify, refresh, forgot/reset password)
+  │   └── UsersController (get profile)
+  │
+  ├── Application Layer (CQRS)
+  │   ├── Commands: RegisterUser, LoginUser, VerifyEmail, SendOTP, RefreshToken, ResetPassword
+  │   ├── Queries: GetUserProfile
+  │   └── Validators: RegisterUserValidator
+  │
+  ├── Domain Layer
+  │   ├── Entities: User, OTPCode, RefreshToken
+  │   └── Interfaces: IUserRepository, IOTPRepository, IRefreshTokenRepository,
+  │                   IPasswordHasher, IOTPHasher, ITokenService, IEmailService, IEventPublisher
+  │
+  └── Infrastructure Layer
+      ├── Persistence: IdentityDbContext, UserRepository, OTPRepository, RefreshTokenRepository
+      ├── Services: BCryptPasswordHasher, BCryptOTPHasher, JwtTokenService, GmailEmailService
+      └── Messaging: EventPublisher
+
+Key Design Decisions:
+  - Passwords hashed with BCrypt (never stored in plain text)
+  - OTP codes hashed before storage
+  - JWT tokens with refresh token rotation
+  - Email verification required before full account activation
+  - Forgot password always returns 200 (prevents email enumeration)
+
+--------------------------------------------------------------------------------
+
+5.2 Card Service
+-----------------
+Responsibility: Credit card registration, verification, management, and encrypted
+                storage of sensitive card data.
+
+Components:
+  ├── API Layer
+  │   └── CardsController (add, remove, set default, verify, update limit,
+  │                        get all, get by id, utilization, reveal)
+  │
+  ├── Application Layer (CQRS)
+  │   ├── Commands: AddCard, RemoveCard, SetDefaultCard, VerifyCard, UpdateCardLimit
+  │   └── Queries: GetCards, GetCardById, GetCardUtilization, RevealCard
+  │
+  ├── Domain Layer
+  │   ├── Entities: CreditCard, CardIssuer
+  │   └── Interfaces: ICreditCardRepository, ICardIssuerRepository,
+  │                   ICardEncryptionService, IEventPublisher
+  │
+  └── Infrastructure Layer
+      ├── Persistence: CardDbContext, CreditCardRepository, CardIssuerRepository
+      ├── Services: AesCardEncryptionService
+      ├── Messaging: EventPublisher, Consumers (PaymentCompletedConsumer, ExternalBillPaidConsumer)
+
+Key Design Decisions:
+  - Card numbers encrypted with AES-256 before database storage
+  - Only last 4 digits stored in plain text (for display)
+  - Soft delete pattern (cards never truly deleted)
+  - Card verification via Rs.1 micro-authorization
+  - Computed properties: AvailableCredit, Utilization, IsExpired
+
+--------------------------------------------------------------------------------
+
+5.3 Payment Service
+--------------------
+Responsibility: Payment processing, transaction ledger, risk assessment, fraud
+                detection, and external bill payments.
+
+Components:
+  ├── API Layer
+  │   ├── PaymentsController (initiate, complete, reverse, get all, get by id)
+  │   ├── TransactionsController (get all, sync, get risk)
+  │   └── ExternalBillsController (initiate, verify, get all)
+  │
+  ├── Application Layer (CQRS)
+  │   ├── Commands: InitiatePayment, CompletePayment, ReversePayment,
+  │   │             InitiateExternalBillPayment, CompleteExternalBillPayment,
+  │   │             EvaluateRisk, SyncTransactions
+  │   └── Queries: GetPayments, GetPaymentById, GetTransactions, GetRiskScore,
+  │                GetExternalBillPayments
+  │
+  ├── Domain Layer
+  │   ├── Entities: Payment, Transaction, PaymentSaga, RiskScore, FraudAlert, ExternalBillPayment
+  │   └── Interfaces: IPaymentRepository, ITransactionRepository, IPaymentSagaRepository,
+  │                   IRiskScoreRepository, IFraudAlertRepository, IExternalBillPaymentRepository,
+  │                   IEventPublisher, IEmailService, IOTPHasher
+  │
+  └── Infrastructure Layer
+      ├── Persistence: PaymentDbContext, repositories
+      ├── Services: GmailEmailService, BCryptOTPHasher
+      └── Messaging: EventPublisher
+
+Key Design Decisions:
+  - Saga pattern for distributed transaction management
+  - Risk scoring: <30 auto-approve, 30-70 OTP required, >70 block
+  - OTP verification for all payments (5-minute expiry)
+  - External bills have 15-minute OTP expiry
+  - Transaction ledger pattern (separate Transaction entity)
+  - Soft delete for payments
+
+--------------------------------------------------------------------------------
+
+5.4 Billing Service
+--------------------
+Responsibility: Bill generation, payment scheduling, spending tracking, and
+                reward point management.
+
+Components:
+  ├── API Layer
+  │   ├── BillsController (generate, update status, get bills, get by id,
+  │   │                    upcoming bills, spending summary)
+  │   └── SchedulesController (schedule payment, cancel schedule)
+  │
+  ├── Application Layer (CQRS)
+  │   ├── Commands: GenerateBill, UpdateBillStatus, SchedulePayment, CancelSchedule
+  │   └── Queries: GetBills, GetBillById, GetUpcomingBills, GetSpendingSummary
+  │
+  ├── Domain Layer
+  │   ├── Entities: Bill, PaymentSchedule, RewardAccount, RewardTier, RewardTransaction
+  │   └── Interfaces: IBillRepository, IPaymentScheduleRepository, IRewardAccountRepository,
+  │                   IRewardTierRepository, IRewardTransactionRepository, IEventPublisher
+  │
+  └── Infrastructure Layer
+      ├── Persistence: BillingDbContext, repositories
+      ├── Messaging: EventPublisher, Consumer (PaymentCompletedConsumer)
+
+Key Design Decisions:
+  - Bill lifecycle: Pending → PartiallyPaid → Paid OR Overdue
+  - Computed field: RemainingBalance = TotalAmount - AmountPaid
+  - Scheduled payments auto-execute on scheduled date
+  - Reward points based on payment amount and tier
+  - Soft delete for bills
+
+--------------------------------------------------------------------------------
+
+5.5 Notification Service
+--------------------------
+Responsibility: Real-time notifications via multiple channels (Email, SMS, Push,
+                InApp) triggered by events from other services.
+
+Components:
+  ├── API Layer
+  │   └── NotificationsController (get notifications, unread count, mark read, mark all read)
+  │
+  ├── Application Layer (CQRS)
+  │   ├── Commands: MarkNotificationRead, MarkAllRead
+  │   └── Queries: GetNotifications, GetUnreadCount
+  │
+  ├── Domain Layer
+  │   ├── Entities: Notification, NotificationPreference
+  │   └── Interfaces: INotificationRepository, INotificationPreferenceRepository, IEventPublisher
+  │
+  └── Infrastructure Layer
+      ├── Persistence: NotificationDbContext, repositories
+      ├── Messaging: EventPublisher, Multiple Consumers (PaymentCompleted, BillDueReminder,
+      │            CardExpirySoon, ExternalBillPaid, FraudDetected, PasswordResetRequested,
+      │            RewardEarned, UserRegistered, PaymentFailed)
+
+Key Design Decisions:
+  - Notifications created via event consumption (not direct API calls)
+  - Supports multiple channels: Email, SMS, Push, InApp
+  - Priority levels: Low, Normal, High, Critical
+  - Pagination support for notification retrieval
+  - NotificationPreference allows users to control channels
+
+--------------------------------------------------------------------------------
+
+5.6 API Gateway (Ocelot)
+--------------------------
+Responsibility: Route incoming requests to appropriate microservices, handle
+                cross-cutting concerns like rate limiting and auth forwarding.
+
+Configuration:
+  - Routes defined in ocelot.json
+  - Load balancing (if multiple instances)
+  - CORS handling
+  - Request/response transformation
+  - Rate limiting (future)
+  - Request aggregation (future)
+
+Route Mapping:
+  /api/identity/*      → Identity Service
+  /api/payments/*      → Payment Service
+  /api/transactions/*  → Payment Service
+  /api/external-bills/* → Payment Service
+  /api/billing/*       → Billing Service
+  /api/cards/*         → Card Service
+  /api/notifications/* → Notification Service
+
+================================================================================
+                          6. DATABASE DESIGN
+================================================================================
+
+6.1 Database Strategy
+----------------------
+Database-per-service pattern: Each microservice owns its own database.
+No service directly accesses another service's database.
+
+6.2 Identity Database
+----------------------
+Tables:
+  - Users: User accounts with email, password hash, name, role, status
+  - OtpCodes: OTP codes with hash, purpose, expiry, used status
+  - RefreshTokens: Refresh tokens with hash, expiry, revocation status
+
+6.3 Card Database
+------------------
+Tables:
+  - CreditCards: Card data with encrypted fields, limits, balances
+  - CardIssuers: Bank/issuer information (name, card length, BIN prefixes)
+
+6.4 Payment Database
+---------------------
+Tables:
+  - Payments: Payment records with status, OTP, amount
+  - Transactions: Ledger entries for payments and reversals
+  - PaymentSagas: Saga state tracking for distributed transactions
+  - RiskScores: Risk assessment scores and decisions
+  - FraudAlerts: Fraud detection alerts with status
+  - ExternalBillPayments: External bill payment records
+
+6.5 Billing Database
+---------------------
+Tables:
+  - Bills: Bill records with amounts, due dates, status
+  - PaymentSchedules: Scheduled future payments
+  - RewardAccounts: User reward point balances
+  - RewardTiers: Reward tier definitions
+  - RewardTransactions: Reward earning/redemption history
+
+6.6 Notification Database
+--------------------------
+Tables:
+  - Notifications: User notifications with type, message, read status
+  - NotificationPreferences: User channel preferences
+
+6.7 ORM Strategy
+-----------------
+  - Entity Framework Core Code-First approach
+  - Fluent API configurations for entity mapping
+  - Auto-migrations on service startup
+  - Soft delete pattern implemented via IsDeleted flag
+
+================================================================================
+                          7. API GATEWAY DESIGN
+================================================================================
+
+7.1 Purpose
+-----------
+The API Gateway serves as the single entry point for all client requests.
+It routes requests to the appropriate backend microservice.
+
+7.2 Features
+-------------
+  - Request routing based on URL patterns
+  - Load balancing (when scaling horizontally)
+  - Authentication forwarding (JWT passed through)
+  - CORS handling
+  - Centralized error handling
+  - Request/response logging
+  - Rate limiting (planned)
+  - Request caching (planned)
+
+7.3 Configuration
+------------------
+  - Ocelot configuration in ocelot.json
+  - Route definitions with Upstream/Downstream paths
+  - Authentication configuration
+  - QoS options (timeout, retry)
+
+7.4 Health Checks
+------------------
+  - Each service exposes /health endpoint
+  - Gateway can aggregate health status
+  - Format: { status: "healthy", service: "name", time: "timestamp" }
+
+================================================================================
+                          8. INTER-SERVICE COMMUNICATION
+================================================================================
+
+8.1 Communication Patterns
+---------------------------
+  - Synchronous: REST API calls (client to services via gateway)
+  - Asynchronous: Event-driven messaging via RabbitMQ
+
+8.2 Event-Driven Architecture
+------------------------------
+Services publish events when state changes. Other services consume events
+to update their own state or trigger actions.
+
+Message Broker: RabbitMQ
+Messaging Library: MassTransit
+Pattern: Publish/Subscribe
+
+8.3 Event Flow
+---------------
+
+  Identity Service publishes:
+    ├─ UserRegisteredEvent → Notification Service creates welcome notification
+    └─ PasswordResetRequestedEvent → Notification Service sends password reset alert
+
+  Payment Service publishes:
+    ├─ PaymentInitiatedEvent → (future: analytics service)
+    ├─ PaymentCompletedEvent → Billing Service updates bill, Card Service updates balance
+    │                         → Notification Service sends payment success notification
+    ├─ PaymentFailedEvent → Notification Service alerts user
+    ├─ FraudDetectedEvent → Notification Service sends security alert
+    └─ ExternalBillPaidEvent → Card Service updates outstanding balance
+                              → Notification Service sends confirmation
+
+  Billing Service publishes:
+    ├─ BillGeneratedEvent → Notification Service sends bill alert
+    ├─ BillDueReminderEvent → Notification Service sends due reminder
+    └─ RewardEarnedEvent → Notification Service sends reward notification
+
+  Card Service publishes:
+    ├─ CardAddedEvent → Notification Service sends card registration confirmation
+    └─ CardExpirySoonEvent → Notification Service sends expiry reminder
+
+8.4 Event Reliability
+----------------------
+  - Events published after database commit (outbox pattern future)
+  - Idempotent event consumers (safe to process multiple times)
+  - Dead letter queue for failed events (future)
+  - Event versioning for schema evolution (future)
+
+8.5 Saga Pattern
+-----------------
+Used for distributed payment transactions:
+
+  Payment Saga Flow:
+    1. InitiatePayment → Create PaymentSaga (state: Initiated)
+    2. RiskCheck → Update PaymentSaga (state: RiskCheckPassed)
+    3. ProcessPayment → Update PaymentSaga (state: Processing)
+    4. Complete → Update PaymentSaga (state: Completed, reward points granted)
+    OR
+    4. Fail → Update PaymentSaga (state: Failed, compensation reason recorded)
+
+================================================================================
+                          9. SECURITY DESIGN
+================================================================================
+
+9.1 Authentication
+-------------------
+  - JWT Bearer tokens for API authentication
+  - Token expiry: 1 hour (configurable)
+  - Refresh tokens: 7 days validity
+  - Token rotation: New refresh token issued on each refresh
+  - Shared secret key across all services
+  - JWT claims: UserId, Email, Role
+
+9.2 Authorization
+------------------
+  - Role-based access control (RBAC)
+  - Roles: User, Admin (future)
+  - [Authorize] attribute on protected endpoints
+  - [AllowAnonymous] on auth endpoints
+  - UserId extracted from JWT (not from request body)
+
+9.3 Data Security
+------------------
+  Passwords:
+    - BCrypt hashing (work factor: 10)
+    - Never stored or transmitted in plain text
+    - Comparison done via BCrypt verification
+
+  OTP Codes:
+    - Hashed with BCrypt before storage
+    - 5-minute expiry (15 minutes for external bills)
+    - Single use only (marked as used after verification)
+
+  Credit Card Data:
+    - AES-256 encryption for card numbers and CVV
+    - Only last 4 digits stored in plain text
+    - Encrypted fields: EncryptedCardNumber, EncryptedCVV
+    - Decryption only on /reveal endpoint
+    - Key stored in environment variables
+
+9.4 API Security
+-----------------
+  - CORS configured for specific origins
+  - HTTPS enforced in production
+  - JWT token validation (issuer, audience, lifetime, signature)
+  - ClockSkew = Zero (tokens expire exactly at expiration time)
+  - Input validation via FluentValidation
+  - SQL injection prevented via EF Core parameterized queries
+
+9.5 Infrastructure Security
+----------------------------
+  - Secrets in environment variables (not in code)
+  - Database credentials in configuration
+  - RabbitMQ credentials secured
+  - Docker secrets for production
+
+================================================================================
+                          10. DEPLOYMENT ARCHITECTURE
+================================================================================
+
+10.1 Development Environment
+------------------------------
+  - Local development via Docker Compose
+  - Each service runs in separate container
+  - SQL Server in container
+  - RabbitMQ in container
+  - Services communicate via Docker network
+
+10.2 Docker Compose Services
+------------------------------
+  - finvault-identity (Identity Service)
+  - finvault-card (Card Service)
+  - finvault-payment (Payment Service)
+  - finvault-billing (Billing Service)
+  - finvault-notification (Notification Service)
+  - finvault-gateway (API Gateway)
+  - sqlserver (SQL Server database)
+  - rabbitmq (RabbitMQ message broker)
+
+10.3 Deployment Strategy
+--------------------------
+  - Container-based deployment
+  - CI/CD via GitHub Actions
+  - Automated builds on push to main
+  - Database migrations on startup
+  - Health checks for each service
+  - Rolling updates (future: Kubernetes)
+
+10.4 Configuration Management
+-------------------------------
+  - appsettings.json per service
+  - Environment-specific overrides (appsettings.Development.json, Production.json)
+  - Environment variables for secrets
+  - Docker Compose environment variables
+
+================================================================================
+                          11. DATA FLOW
+================================================================================
+
+11.1 User Registration Flow
+-----------------------------
+  Client → POST /api/identity/auth/register → Gateway → Identity Service
+    → Validate input → Hash password → Create User → Generate OTP
+    → Publish UserRegisteredEvent → Return JWT tokens
+    → Email sent with OTP → Client verifies email
+
+11.2 Payment Processing Flow
+------------------------------
+  Client → POST /api/payments → Gateway → Payment Service
+    → Extract UserId from JWT → Create Payment (Initiated)
+    → Send OTP via email → Create PaymentSaga (Initiated)
+    → Evaluate Risk → Create RiskScore
+    → If risk > 70: Block payment
+    → If risk 30-70: Require OTP
+    → If risk < 30: Auto-approve
+    → Client submits OTP → Complete Payment
+    → Publish PaymentCompletedEvent → Update Bill → Update Card Balance
+    → Create Transaction → Grant Rewards → Send Notification
+
+11.3 External Bill Payment Flow
+---------------------------------
+  Client → POST /api/external-bills/pay → Gateway → Payment Service
+    → Create ExternalBillPayment (Initiated)
+    → Send OTP (15-min expiry)
+    → Client submits OTP → Verify → Complete payment
+    → Publish ExternalBillPaidEvent → Card Service updates balance
+    → Notification Service sends confirmation
+
+11.4 Notification Flow
+------------------------
+  Service publishes event → RabbitMQ → Notification Service Consumer
+    → Create Notification in database
+    → Check user preferences → Determine channels
+    → Send via Email/SMS/Push/InApp (future implementations)
+
+================================================================================
+                          12. SCALABILITY CONSIDERATIONS
+================================================================================
+
+12.1 Horizontal Scaling
+------------------------
+  - Each service can scale independently
+  - Multiple instances behind load balancer
+  - RabbitMQ distributes messages across consumers
+  - Database read replicas (future)
+
+12.2 Database Scaling
+----------------------
+  - Connection pooling via EF Core
+  - Indexed queries for performance
+  - Read/write splitting (future)
+  - Database sharding by UserId (future, if needed)
+
+12.3 Caching Strategy
+----------------------
+  - In-memory caching for static data (RewardTiers, CardIssuers)
+  - Distributed cache (Redis) for frequent queries (future)
+  - Cache invalidation on updates
+
+12.4 Message Queue Scaling
+---------------------------
+  - RabbitMQ clustering (future)
+  - Multiple consumers per queue
+  - Prefetch count optimization
+  - Queue prioritization (future)
+
+================================================================================
+                          13. ERROR HANDLING STRATEGY
+================================================================================
+
+13.1 Global Exception Middleware
+---------------------------------
+  Each service has ExceptionMiddleware that:
+    - Catches all unhandled exceptions
+    - Maps exceptions to HTTP status codes
+    - Logs errors via Serilog
+    - Returns consistent ApiResponse format
+
+  Exception Mapping:
+    ValidationException → 400 Bad Request
+    NotFoundException → 404 Not Found
+    UnauthorizedAccessException → 401 Unauthorized
+    TransactionFailedException → 500 Internal Server Error
+    Generic Exception → 500 Internal Server Error
+
+13.2 Validation
+----------------
+  - FluentValidation for input validation
+  - ValidationPipelineBehavior in MediatR
+  - Validation errors returned as 400 with field-level errors
+  - Domain entity validation in factory methods
+
+13.3 Distributed Error Handling
+---------------------------------
+  - Saga pattern handles payment failures with compensation
+  - Failed events logged for investigation
+  - Dead letter queue for unrecoverable events (future)
+  - Idempotent operations for retry safety
+
+================================================================================
+                          14. MONITORING AND LOGGING
+================================================================================
+
+14.1 Logging Strategy
+----------------------
+  - Serilog structured logging
+  - Log levels: Debug, Information, Warning, Error, Fatal
+  - Console output for development
+  - File/Database output for production (future)
+  - Request logging via UseSerilogRequestLogging()
+
+14.2 What is Logged
+--------------------
+  - All HTTP requests (method, path, status, duration)
+  - Validation failures
+  - Authentication failures
+  - Payment state changes
+  - Fraud alerts
+  - Unhandled exceptions with stack traces
+
+14.3 Health Monitoring
+-----------------------
+  - /health endpoint on each service
+  - Database connectivity check
+  - RabbitMQ connectivity check (future)
+  - Load balancer health checks
+
+14.4 Future Enhancements
+--------------------------
+  - Application Insights integration
+  - Distributed tracing
+  - Metrics dashboards (Grafana)
+  - Alert notifications (Slack, Email)
+
+================================================================================
+                          15. FUTURE ENHANCEMENTS
+================================================================================
+
+15.1 Short-Term (Next 3 Months)
+---------------------------------
+  - Email service implementation (currently placeholder)
+  - SMS notification channel
+  - Push notification support
+  - Password change endpoint
+  - Forgot password via mobile OTP
+
+15.2 Medium-Term (Next 6 Months)
+----------------------------------
+  - Admin dashboard
+  - Advanced fraud detection (ML-based)
+  - Payment reminders via SMS/Email
+  - Export transaction history (CSV/PDF)
+  - Multi-currency support
+  - Webhook integrations for third parties
+
+15.3 Long-Term (Next 12 Months)
+----------------------------------
+  - Mobile app (React Native/Flutter)
+  - AI-powered spending insights
+  - Budget planning tools
+  - Credit score integration
+  - Loyalty program integration
+  - Open Banking API (PSD2 compliance)
+  - Blockchain-based transaction audit trail
+
+================================================================================
+                          APPENDIX A: GLOSSARY
+================================================================================
+
+  AES: Advanced Encryption Standard - Symmetric encryption algorithm
+  API: Application Programming Interface
+  BCrypt: Password hashing function
+  CQRS: Command Query Responsibility Segregation
+  CORS: Cross-Origin Resource Sharing
+  DTO: Data Transfer Object
+  EF Core: Entity Framework Core - Object-Relational Mapper
+  HLD: High Level Design
+  JWT: JSON Web Token - Authentication token format
+  OTP: One-Time Password - Temporary verification code
+  RBAC: Role-Based Access Control
+  REST: Representational State Transfer - API architecture style
+  Saga: Distributed transaction pattern
+  Swagger: API documentation tool
+  UUID/GUID: Globally Unique Identifier
+
+================================================================================
+                          APPENDIX B: ACRONYMS
+================================================================================
+
+  - HLD: High Level Design
+  - LLD: Low Level Design
+  - API: Application Programming Interface
+  - JWT: JSON Web Token
+  - OTP: One-Time Password
+  - AES: Advanced Encryption Standard
+  - CQRS: Command Query Responsibility Segregation
+  - EF: Entity Framework
+  - ORM: Object-Relational Mapping
+  - DTO: Data Transfer Object
+  - CORS: Cross-Origin Resource Sharing
+  - CI/CD: Continuous Integration/Continuous Deployment
+
+================================================================================
+                          APPENDIX C: REFERENCE DOCUMENTS
+================================================================================
+
+  1. API Reference Documentation (docs/API_Reference.docx)
+  2. Low Level Design Document (to be created)
+  3. Database Schema Documentation
+  4. Deployment Guide
+  5. Testing Strategy Document
+  6. Security Audit Report
+
+================================================================================
+                          DOCUMENT HISTORY
+================================================================================
+
+  Version | Date          | Author          | Description
+  --------|---------------|-----------------|---------------------------
+  1.0     | April 11, 2026| Development Team| Initial HLD document
+
+================================================================================
+                          END OF HLD DOCUMENT
+================================================================================

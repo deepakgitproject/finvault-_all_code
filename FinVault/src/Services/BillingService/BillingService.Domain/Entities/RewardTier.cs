@@ -1,15 +1,17 @@
 namespace BillingService.Domain.Entities;
 
+// Defines a reward tier with minimum points and cashback percentage
 public class RewardTier
 {
-    public Guid Id { get; private set; }
-    public string Name { get; private set; } = string.Empty;
-    public int MinPoints { get; private set; }
-    public decimal CashbackPercent { get; private set; }
-    public DateTimeOffset CreatedAt { get; private set; }
+    public Guid Id { get; private set; }  // Unique identifier
+    public string Name { get; private set; } = string.Empty;  // Tier display name
+    public int MinPoints { get; private set; }  // Minimum points required for this tier
+    public decimal CashbackPercent { get; private set; }  // Cashback percentage for this tier
+    public DateTimeOffset CreatedAt { get; private set; }  // Creation timestamp
 
     private RewardTier() { } // Required by EF Core
 
+    // Factory method to create a new reward tier with validation
     public static RewardTier Create(string name, int minPoints, decimal cashbackPercent)
     {
         if (string.IsNullOrWhiteSpace(name)) throw new ArgumentException("Name is required.");

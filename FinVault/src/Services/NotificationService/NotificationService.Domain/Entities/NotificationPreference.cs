@@ -1,16 +1,19 @@
+// File: NotificationPreference.cs - Domain entity for user notification channel preferences
 namespace NotificationService.Domain.Entities;
 
 public class NotificationPreference
 {
-    public Guid Id { get; private set; }
-    public Guid UserId { get; private set; }
-    public string Channel { get; private set; } = string.Empty;  // Email, SMS, Push, InApp
-    public bool IsEnabled { get; private set; }
-    public DateTimeOffset CreatedAt { get; private set; }
-    public DateTimeOffset? UpdatedAt { get; private set; }
+    public Guid Id { get; private set; }  // Unique preference identifier
+    public Guid UserId { get; private set; }  // User who owns this preference
+    public string Channel { get; private set; } = string.Empty;  // Notification channel: Email, SMS, Push, InApp
+    public bool IsEnabled { get; private set; }  // Whether this channel is enabled for the user
+    public DateTimeOffset CreatedAt { get; private set; }  // When preference was created
+    public DateTimeOffset? UpdatedAt { get; private set; }  // When preference was last updated
 
-    private NotificationPreference() { } // Required by EF Core
+    // Private constructor for EF Core
+    private NotificationPreference() { }
 
+    // Factory method to create notification preference for a channel
     public static NotificationPreference Create(Guid userId, string channel, bool isEnabled = true)
     {
         if (userId == Guid.Empty) throw new ArgumentException("UserId is required.");
@@ -26,6 +29,7 @@ public class NotificationPreference
         };
     }
 
+    // Enables or disables this notification channel
     public void SetEnabled(bool enabled)
     {
         IsEnabled = enabled;
