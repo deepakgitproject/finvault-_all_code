@@ -58,7 +58,7 @@ export interface MarkReadApiResponse {
 @Component({
     selector: 'app-notifications',
     standalone: true,
-    imports: [CommonModule, RouterLink, SidebarComponent, ThemeToggleComponent],
+    imports: [CommonModule, SidebarComponent, ThemeToggleComponent],
     templateUrl: './notifications.html',
     styleUrls: ['./notifications.scss'],
     changeDetection: ChangeDetectionStrategy.OnPush,

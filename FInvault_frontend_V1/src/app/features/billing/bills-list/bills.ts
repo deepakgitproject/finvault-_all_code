@@ -56,7 +56,7 @@ interface ApiBill {
 @Component({
     selector: 'app-bills',
     standalone: true,
-    imports: [CommonModule, RouterLink, SidebarComponent, ThemeToggleComponent, ComingSoonComponent, BillerFormModalComponent],
+    imports: [CommonModule, SidebarComponent, ThemeToggleComponent, ComingSoonComponent, BillerFormModalComponent],
     templateUrl: './bills.html',
     styleUrls: ['./bills.scss'],
 })

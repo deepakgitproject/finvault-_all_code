@@ -81,14 +81,10 @@ export class PaymentPageComponent implements OnInit {
   focusedCardIndex: number = 0;
 
   paymentType = computed(() => {
-    if (!this.selectedCard) return 'card';
+    if (!this.selectedCard) return 'Full';
     const amt = this.paymentAmount;
     const outstanding = this.selectedCard.outstandingBalance;
-    const minDue = this.getMinDue(outstanding);
-
-    if (amt >= outstanding) return 'Full';
-    if (amt <= minDue) return 'Minimum';
-    return 'Partial';
+    return amt >= outstanding ? 'Full' : 'Partial';
   });
 
   constructor() {}

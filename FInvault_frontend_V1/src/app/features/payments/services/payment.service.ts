@@ -28,44 +28,61 @@ export class PaymentService {
 
         // Try to find a bill matching this cardId
         const cardBills = bills.filter((b: any) => normalize(b.cardId) === normalizedCardId);
-        // Prefer unpaid/pending bills
-        const unpaid = cardBills.find((b: any) =>
+        // Only use unpaid/pending bills — never pay against an already-paid bill
+        const unpaid = cardBills.filter((b: any) =>
           b.status?.toLowerCase() !== 'paid'
         );
-        const fallback = cardBills[0] || bills[0];
-        const bill = unpaid || fallback;
 
-        if (bill?.id) {
+        if (unpaid.length > 0) {
+          const bill = unpaid[0];
           console.log('[PaymentService] Using existing billId:', bill.id, 'status:', bill.status);
           return of(bill.id as string);
         }
 
-        // No bills found -> auto-generate one
-        console.log('[PaymentService] No bills found. Auto-generating bill for card:', cardId);
-        return this.autoGenerateBill(userId, cardId, amount);
+        // All bills are paid -> auto-generate a new one for the next available month
+        console.log('[PaymentService] All bills are paid. Auto-generating new bill for card:', cardId);
+        return this.autoGenerateBillNextMonth(bills, userId, cardId, amount);
       }),
       timeout(8000)
     );
   }
 
   /**
-   * Auto-generate a bill for the card so the payment flow can proceed.
-   * This creates a billing cycle entry and returns the new bill's ID.
+   * Auto-generate a bill for the next available billing month.
+   * Finds the latest existing billing month for the card and creates one for the month after.
    */
-  private autoGenerateBill(userId: string, cardId: string, amount: number): Observable<string> {
-    const now = new Date();
-    const dueDate = new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000); // 30 days from now
+  private autoGenerateBillNextMonth(existingBills: any[], userId: string, cardId: string, amount: number): Observable<string> {
+    // Filter bills for this card and find the latest billing month
+    const normalize = (id: string) => (id || '').toLowerCase().replace(/-/g, '');
+    const normalizedCardId = normalize(cardId);
+    const cardBills = existingBills.filter((b: any) => normalize(b.cardId) === normalizedCardId);
+
+    let latestMonth = new Date();
+    for (const bill of cardBills) {
+      if (bill.billingMonth) {
+        const [y, m] = bill.billingMonth.split('-').map(Number);
+        const d = new Date(y, m - 1, 1);
+        if (d > latestMonth) latestMonth = d;
+      }
+    }
+
+    // Go one month beyond the latest existing bill
+    const billMonth = new Date(latestMonth.getFullYear(), latestMonth.getMonth() + 1, 1);
+    const dueDate = new Date(billMonth.getTime() + 30 * 24 * 60 * 60 * 1000);
+
+    // MinimumDue must be <= TotalAmount; use 5% of amount (min 1)
+    const minDue = Math.min(amount, Math.max(1, Math.round(amount * 0.05)));
 
     const payload = {
-      UserId: userId,
-      CardId: cardId,
-      TotalAmount: amount,
-      MinimumDue: Math.max(100, Math.round(amount * 0.05)),
-      DueDate: dueDate.toISOString(),
-      BillingMonth: `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`
+      userId: userId,
+      cardId: cardId,
+      totalAmount: amount,
+      minimumDue: minDue,
+      dueDate: dueDate.toISOString(),
+      billingMonth: `${billMonth.getFullYear()}-${String(billMonth.getMonth() + 1).padStart(2, '0')}`
     };
 
-    console.log('[PaymentService] Auto-generating bill with payload:', payload);
+    console.log('[PaymentService] Auto-generating bill for next available month with payload:', payload);
 
     return this.http.post<any>(`${this.apiUrl}/api/billing/bills`, payload).pipe(
       map(res => {
@@ -78,17 +95,14 @@ export class PaymentService {
         return billId;
       }),
       catchError(err => {
-        console.error('[PaymentService] Failed to auto-generate bill:', err);
+        console.error('[PaymentService] Failed to auto-generate next month bill:', err);
         return throwError(() => new Error('Could not generate a billing cycle. Please try again.'));
       })
     );
   }
 
-  initiatePayment(cardId: string, amount: number, paymentType: string = 'card', billId: string = ''): Observable<any> {
-    const userId = this.authService.getUserId();
-
+  initiatePayment(cardId: string, amount: number, paymentType: string = 'Full', billId: string = ''): Observable<any> {
     const payload = {
-      userId: userId,
       cardId: cardId,
       billId: billId,
       amount: amount,
@@ -126,7 +140,7 @@ export class PaymentService {
    *   2. Initiate payment with the real billId
    *   3. Backend completes payment in the POST step itself
    */
-  makePayment(cardId: string, amount: number, paymentType: string = 'card', billId: string | null = null): Observable<any> {
+  makePayment(cardId: string, amount: number, paymentType: string = 'Full', billId: string | null = null): Observable<any> {
     console.log('[PaymentService] makePayment called with:', { cardId, amount, paymentType, billId });
     const userId = this.authService.getUserId() || '';
 

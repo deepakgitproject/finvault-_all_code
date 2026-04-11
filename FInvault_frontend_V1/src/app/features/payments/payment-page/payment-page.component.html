@@ -225,8 +225,8 @@
           </div>
 
           <div class="action-bar">
-            <button 
-              class="primary-btn" 
+            <button
+              class="primary-btn"
               [disabled]="paymentAmount < 1 || paymentAmount > selectedCard.outstandingBalance"
               (click)="showRazorpayModal = true">
               Proceed to Pay →

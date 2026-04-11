@@ -30,7 +30,7 @@ interface NewCardForm {
 @Component({
   selector: 'app-cards',
   standalone: true,
-  imports: [CommonModule, RouterLink, FormsModule, SidebarComponent, ThemeToggleComponent, ComingSoonComponent, ToastComponent],
+  imports: [CommonModule, FormsModule, SidebarComponent, ThemeToggleComponent, ComingSoonComponent, ToastComponent],
   templateUrl: './cards.html',
   styleUrl: './cards.scss'
 })

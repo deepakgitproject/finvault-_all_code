@@ -15,7 +15,7 @@ export class FakeRazorpayComponent {
   @Input() cardId: string = '';
   @Input() amount: number = 0;
   @Input() cardLastFour: string = '';
-  @Input() paymentType: string = 'card';
+  @Input() paymentType: string = 'Full';
 
   @Output() paymentSuccess = new EventEmitter<any>();
   @Output() paymentCancelled = new EventEmitter<void>();

@@ -72,7 +72,7 @@ export interface PaymentFormModel {
 @Component({
     selector: 'app-pay-bill',
     standalone: true,
-    imports: [CommonModule, RouterLink, FormsModule, SidebarComponent, ThemeToggleComponent],
+    imports: [CommonModule, FormsModule, SidebarComponent, ThemeToggleComponent],
     templateUrl: './pay-bill.html',
     styleUrls: ['./pay-bill.scss'],
 })
